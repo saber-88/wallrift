@@ -220,8 +220,8 @@ int main(int argc, char* argv[]) {
   
   GLuint textureId = loadImageIntoGPU(wallpath, &img_w , &img_h);
   gl.prog =
-      createProgram("/usr/share/wallrift/wallpaper.vert",
-                    "/usr/share/wallrift/wallpaper.frag");
+      createProgram("/usr/share/wallrift/shaders/wallpaper.vert",
+                    "/usr/share/wallrift/shaders/wallpaper.frag");
 
   // wallpaper coordinates
   glUseProgram(gl.prog);
