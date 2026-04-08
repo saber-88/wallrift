@@ -1,3 +1,7 @@
+/*
+ author : github.com/saber-88
+ */
+
 #include "../include/gl.h"
 #include "../include/wayland.h"
 #include <EGL/egl.h>
