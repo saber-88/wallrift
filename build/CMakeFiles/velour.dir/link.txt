@@ -1,0 +1,1 @@
+/usr/sbin/cc -Wl,--dependency-file=CMakeFiles/velour.dir/link.d CMakeFiles/velour.dir/src/main.c.o "CMakeFiles/velour.dir/src/zwlr-layer-shell-protocol.c.o" "CMakeFiles/velour.dir/src/xdg-shell-protocol.c.o" -o velour  -lwayland-client -lwayland-egl -lEGL -lGLESv2 -lm

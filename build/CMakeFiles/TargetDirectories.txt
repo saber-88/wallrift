@@ -1,0 +1,3 @@
+/home/karmveer/.coding/velour/build/CMakeFiles/velour.dir
+/home/karmveer/.coding/velour/build/CMakeFiles/edit_cache.dir
+/home/karmveer/.coding/velour/build/CMakeFiles/rebuild_cache.dir
