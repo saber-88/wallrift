@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <wayland-client-core.h>
@@ -24,6 +25,53 @@
 #define SOCK_PATH "/tmp/wallrift.sock"
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/stb_image.h"
+
+
+const char* get_cache_file(){
+  const char* xdg = getenv("XDG_CACHE_HOME");
+  static char path[1024];
+  if (xdg && *xdg) {
+    snprintf(path, sizeof(path), "%s/wallrift/current",xdg);
+  }
+  else {
+    snprintf(path, sizeof(path), "%s/.cache/wallrift/current",getenv("HOME"));
+  }
+  return path;
+}
+
+void cache_wallpaper(const char* wallpaper){
+  const char* file = get_cache_file();
+  char dir[1024];
+  snprintf(dir, sizeof(dir), "%s",file);
+  char *slash = strrchr(dir, '/');
+  if (slash) {
+    *slash = '\0';
+    mkdir(dir, 0755);
+  }
+
+  FILE *f = fopen(file, "w");
+  if (f) {
+    fprintf(f, "%s\n",wallpaper);
+    fclose(f);
+  }
+}
+
+const char* get_cached_wallpaper() {
+    static char wall[5000];
+    const char *cache_file = get_cache_file();
+    FILE *f = fopen(cache_file, "r");
+    if (!f) {
+        return NULL;
+    }
+    if (!fgets(wall, sizeof(wall), f)) {
+        fclose(f);
+        return NULL;
+    }
+    // remove newline
+    wall[strcspn(wall, "\n")] = '\0';
+    fclose(f);
+    return wall;
+}
 
 GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int* imageHeight, GLuint texID) {
 
@@ -39,6 +87,7 @@ GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int* imageHeight, GLuint
   unsigned char *pixels = stbi_load(expanded, imageWidth, imageHeight, &channels, 4);
   if (!pixels) {
     printf("\nCannot load image\n");
+    return texID;
   }
 
   if (texID == 0) {
@@ -158,8 +207,16 @@ void gl_draw(WL *wl, GL *gl, int texloc, GLuint textureId){
 }
 int main() {
 
-  char *wallpath = NULL;
-  char *pendingPath = NULL;
+  char wallpath[5000];
+  const char* cached = get_cached_wallpaper();
+  if (cached) {
+    snprintf(wallpath, sizeof(wallpath), "%s", cached);
+  }
+  else {
+    wallpath[0] = '\0';
+  }
+
+
   WL wl = {0};
   GL gl = {0};
   wl.display = wl_display_connect(NULL);
@@ -180,9 +237,9 @@ int main() {
   // setting anchors for the surface
   zwlr_layer_surface_v1_set_anchor(wl.layer_surface,
                                    ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP |
-                                       ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
-                                       ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
-                                       ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+                                   ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
+                                   ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
+                                   ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
 
   zwlr_layer_surface_v1_set_size(wl.layer_surface, 0, 0);
 
@@ -233,13 +290,18 @@ int main() {
     printf("\neglMakeCurrent failed\n");
   }
 
-
+ 
 
 
   // GLSL stuff
   
   GLuint textureId = 0;
-  // GLuint textureId = loadImageIntoGPU(wallpath, &img_w , &img_h);
+
+  // load the cached wallpaper
+  if (wallpath[0] != '\0') {
+     textureId = loadImageIntoGPU(wallpath, &img_w , &img_h, textureId);
+     cache_wallpaper(wallpath);
+  }
   gl.prog =
       createProgram("/usr/share/wallrift/shaders/wallpaper.vert",
                     "/usr/share/wallrift/shaders/wallpaper.frag");
@@ -248,7 +310,7 @@ int main() {
   gl.imgWLoc = glGetUniformLocation(gl.prog, "u_img_width");
   gl.imgHLoc = glGetUniformLocation(gl.prog, "u_img_height");
   gl.viewWLoc = glGetUniformLocation(gl.prog, "u_view_width");
-  gl.viewHLoc  = glGetUniformLocation(gl.prog, "u_view_height");
+  gl.viewHLoc = glGetUniformLocation(gl.prog, "u_view_height");
   // unix socket
   int daemon_sock = socket(AF_UNIX, SOCK_STREAM, 0);
 
@@ -295,6 +357,7 @@ int main() {
     if (client != -1) {
       char buff[1024];
       int n = read(client, buff, sizeof(buff)-1);
+      close(client);
       if (n > 0) {
         buff[n] = '\0';
         char *path = NULL;
@@ -318,11 +381,13 @@ int main() {
 
           tok = strtok(NULL, " ");
         }
-        if (path) {
-          pendingPath = strdup(path);
-          textureId = loadImageIntoGPU(pendingPath, &img_w, &img_h, textureId);
-          free(pendingPath);
-          pendingPath = NULL;
+        if (path && strcmp(path, wallpath) != 0) {
+          snprintf(wallpath, sizeof(wallpath), "%s",path);
+          if (textureId != 0) {
+            glDeleteTextures(1, &textureId);
+          }
+          textureId = loadImageIntoGPU(wallpath, &img_w, &img_h, textureId);
+          cache_wallpaper(wallpath);
         }
       }
     }
