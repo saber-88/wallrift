@@ -7,4 +7,11 @@ typedef struct{
   GLuint vbo;
   GLuint vao;
   GLuint ebo;
+
+  int cursorLoc;
+  int imgWLoc;
+  int imgHLoc;
+  int viewWLoc;
+  int viewHLoc;
+
 } GL;
