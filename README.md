@@ -44,19 +44,12 @@ yay -S wallrift-git
 wallrift-daemon
 ```
 
-### Set wallpaper
+### Set wallpaper 
 
 ```bash
 wallrift img /path/to/image.jpg
 ```
-
-### Adjust parallax speed
-
-```bash
-wallrift speed 0.05
-```
-
-### Combined usage
+### You can also adjust parallax speed
 
 ```bash
 wallrift img ~/wallpapers/bg.jpg speed 0.03
