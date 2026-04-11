@@ -228,7 +228,6 @@ void gl_draw(WL *wl, GL *gl, int texloc, GLuint textureId){
 
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     eglSwapBuffers(wl->egl_display, wl->egl_surface);
-    wl_display_dispatch(wl->display);
 
 }
 int main() {
@@ -245,6 +244,7 @@ int main() {
 
   WL wl = {0};
   GL gl = {0};
+  wl.run = 1;
   wl.cursor_x = 0.05f; // initialize it at centre 
   wl.display = wl_display_connect(NULL);
   wl.registry = wl_display_get_registry(wl.display);
@@ -411,7 +411,6 @@ int main() {
 
 
   while (1) {
-
     int client = accept(daemon_sock, NULL, NULL);
     if (client != -1) {
       char buff[1024];
@@ -427,19 +426,19 @@ int main() {
             tok = strtok(NULL, " ");
             if (tok) {
               path = tok;
-            }
-          }
+             }
+           }
           else if (strcmp(tok, "speed") == 0) {
-            tok = strtok(NULL, " ");
-            if (tok) {
-              speed = strtof(tok, NULL);
-              if (speed <= 0.00) speed = 0.00f;
-              if (speed >= 1.00) speed = 1.00f;
-            }
-          }
-
-          tok = strtok(NULL, " ");
+             tok = strtok(NULL, " ");
+             if (tok) {
+               speed = strtof(tok, NULL);
+               if (speed <= 0.00) speed = 0.00f;
+               if (speed >= 1.00) speed = 1.00f;
+             }
+           }
+           tok = strtok(NULL, " ");
         }
+
         if (path && strcmp(path, wallpath) != 0) {
           snprintf(wallpath, sizeof(wallpath), "%s",path);
           if (textureId != 0) {
@@ -450,7 +449,11 @@ int main() {
         }
       }
     }
-    gl_draw(&wl, &gl, texloc, textureId);
+    // render only if the focus is on wallpaper for cpu / gpu efficiency
+    if (wl.run) {
+      gl_draw(&wl, &gl, texloc, textureId);
+    }
+    wl_display_dispatch(wl.display);
   }
 
   close(daemon_sock);

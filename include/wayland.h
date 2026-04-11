@@ -3,6 +3,7 @@
 #include "zwlr-layer-shell-unstable-v1-protocol.h"
 #include <EGL/egl.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <wayland-client-core.h>
@@ -36,6 +37,7 @@ typedef struct {
   double target_cursor;
   double cursor_x;
   int configured, width, height;
+  unsigned int run;
 
 } WL;
 
@@ -75,6 +77,8 @@ static void layer_configure(void* data, struct zwlr_layer_surface_v1 *surface, u
 }
 
 static void layer_closed(void *data, struct zwlr_layer_surface_v1 *surface){
+  WL *wl = (WL *)data;
+  wl->run = 0;
   exit(0);
 }
 
@@ -100,18 +104,29 @@ static void pointer_enter(void *data, struct wl_pointer *pointer,
                           wl_fixed_t sx, wl_fixed_t sy) {
 
   WL *wl = (WL *)data;
+  wl->target_cursor = wl_fixed_to_double(sx);
+
+  float normalized = wl->target_cursor / wl->width;
+  if (normalized < 0.0f) normalized = 0.0f;
+  if (normalized > 1.0f) normalized = 1.0f;
+  wl->target_cursor = normalized;
+
   if (wl->cursor && wl->cursor_surface) {
     struct wl_cursor_image *image = wl->cursor->images[0];
     wl_pointer_set_cursor(pointer, serial, wl->cursor_surface, image->hotspot_x, image->hotspot_y);
     wl_surface_attach(wl->cursor_surface, wl_cursor_image_get_buffer(image), 0, 0);
     wl_surface_damage(wl->cursor_surface, 0, 0, image->width, image->height);
     wl_surface_commit(wl->cursor_surface);
-
   }
+  wl->run = 1;
 }
 
 static void pointer_leave(void *data, struct wl_pointer *pointer,
-                          uint32_t serial, struct wl_surface *surface) {}
+                          uint32_t serial, struct wl_surface *surface) {
+  WL *wl = (WL *)data;
+
+  wl->run = 0;
+}
 
 static void pointer_button(void *data, struct wl_pointer *pointer,
                            uint32_t serial, uint32_t time,
