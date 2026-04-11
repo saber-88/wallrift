@@ -35,6 +35,18 @@ Wallrift consists of two components:
 ```bash
 yay -S wallrift-git
 ```
+### Manual Installation
+
+```bash
+git clone https://github.com/saber-88/wallrift
+cd wallrift
+mkdir build
+cd build
+cmake ..
+make
+```
+### NOTE :
+> wallrift expects the shaders to be located at `/usr/share/wallrift/shaders/` so copy the shaders directory manually .
 ---
 ## 🚀 Usage
 
@@ -70,7 +82,6 @@ wallrift img ~/wallpapers/bg.jpg speed 0.03
 
 - Image is loaded using `stb_image`
 - Uploaded as GPU texture
-- Fragment shader applies parallax offset
 - Cursor movement is interpolated for smooth motion
 
 ---
@@ -79,7 +90,8 @@ wallrift img ~/wallpapers/bg.jpg speed 0.03
 
 - Cursor position controls horizontal movement
 - Smooth interpolation avoids abrupt jumps
-- Works best with images slightly larger than screen resolution
+- Works best with images wider than screen width
+- Lower speed is recommended for smooth fluid motion
 
 ---
 
@@ -87,16 +99,11 @@ wallrift img ~/wallpapers/bg.jpg speed 0.03
 
 ### Dependencies
 
-- Wayland
-- EGL
-- OpenGL ES 2.0
+- `Wayland`
+- `EGL`
+- `OpenGL ES 2.0`
 - `stb_image`
 
-### Compile
-
-```bash
-make
-```
 
 ---
 
@@ -113,7 +120,9 @@ Wallrift communicates via a Unix domain socket:
 
 ## 🧪 Tips
 
-- Use wallpapers slightly larger than your screen for best parallax effect
+- Use wallpapers wider than your screen for best parallax effect
+- You can find wallpapers [here](https://github.com/saber-88/walls)
+- I use [this](https://github.com/saber-88/swifty) wallpaper selector and will recommend also.
 
 
 ---
