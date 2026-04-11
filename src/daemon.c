@@ -25,10 +25,11 @@
 #include <time.h>
 
 
-#define SOCK_PATH "/tmp/wallrift.sock"
+// #define SOCK_PATH "/tmp/wallrift.sock"
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/stb_image.h"
 
+const char* get_sock_path();
 
 double get_time(){
   struct timespec ts;
@@ -330,10 +331,11 @@ int main() {
 
   // unix socket
   int daemon_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-
+  const char* SOCK_PATH= get_sock_path();
   struct sockaddr_un d_addr = {0};
   d_addr.sun_family = AF_UNIX;
-  strncpy(d_addr.sun_path, SOCK_PATH, sizeof(d_addr.sun_path) - 1);
+  strncpy(d_addr.sun_path,SOCK_PATH ,sizeof(d_addr.sun_path) - 1);
+  
   unlink(SOCK_PATH);
 
   if (bind(daemon_sock, (struct sockaddr*)&d_addr, sizeof(d_addr)) == -1) {

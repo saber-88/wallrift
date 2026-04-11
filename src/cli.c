@@ -18,6 +18,7 @@ void printHelp(){
   printf("  \033[1mimg\033[0m      sends the path of the wallpaper to the daemon.\n");
   printf("  \033[1mspeed\033[0m    sets the speed for parllax. Lower speed = smooth interpolation.\n");
 }
+const char* get_sock_path();
 
 int main(int argc, char *argv[])
 {
@@ -51,7 +52,7 @@ int main(int argc, char *argv[])
   struct sockaddr_un addr = {0};
   addr.sun_family = AF_UNIX;
   
-  strncpy(addr.sun_path, SOCK_PATH, sizeof(addr.sun_path) - 1); 
+  strncpy(addr.sun_path, get_sock_path(), sizeof(addr.sun_path) - 1); 
 
   if (connect(sock_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
     perror("Connection to socket failed!\n");
