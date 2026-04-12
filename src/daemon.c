@@ -408,8 +408,7 @@ int main() {
   glUniform2f(resLoc, wl.width, wl.height);
   int imgLoc = glGetUniformLocation(gl.prog, "imgSize");
   glUniform2f(imgLoc, img_w, img_h);
-
-
+  
   while (1) {
     int client = accept(daemon_sock, NULL, NULL);
     if (client != -1) {
@@ -455,7 +454,6 @@ int main() {
     }
     wl_display_dispatch(wl.display);
   }
-
   close(daemon_sock);
   unlink(SOCK_PATH);
   return 0;
