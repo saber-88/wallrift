@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -24,7 +25,6 @@
 #include <wayland-cursor.h>
 #include <wayland-egl.h>
 #include <time.h>
-
 
 #define SOCK_PATH "/tmp/wallrift.sock"
 #define STB_IMAGE_IMPLEMENTATION
@@ -408,51 +408,89 @@ int main() {
   glUniform2f(resLoc, wl.width, wl.height);
   int imgLoc = glGetUniformLocation(gl.prog, "imgSize");
   glUniform2f(imgLoc, img_w, img_h);
+
+  // getting stuff ready for polling
+  wl.wayland_fd = wl_display_get_fd(wl.display);
+
+  struct pollfd fds[2];
+
+  fds[0].fd = wl.wayland_fd;
+  fds[0].events = POLLIN;
+
+  fds[1].fd = daemon_sock;
+  fds[1].events = POLLIN;
+  int did_read = 0;
   
+  // render loop
   while (1) {
-    int client = accept(daemon_sock, NULL, NULL);
-    if (client != -1) {
-      char buff[1024];
-      int n = read(client, buff, sizeof(buff)-1);
-      close(client);
-      if (n > 0) {
-        buff[n] = '\0';
-        char *path = NULL;
-        char *tok = strtok(buff, " ");
 
-        while (tok) {
-          if (strcmp(tok, "img") == 0) {
-            tok = strtok(NULL, " ");
-            if (tok) {
-              path = tok;
-             }
-           }
-          else if (strcmp(tok, "speed") == 0) {
-             tok = strtok(NULL, " ");
-             if (tok) {
-               speed = strtof(tok, NULL);
-               if (speed <= 0.00) speed = 0.00f;
-               if (speed >= 1.00) speed = 1.00f;
-             }
-           }
-           tok = strtok(NULL, " ");
-        }
+    did_read = 0;
+    wl_display_dispatch_pending(wl.display);
 
-        if (path && strcmp(path, wallpath) != 0) {
-          snprintf(wallpath, sizeof(wallpath), "%s",path);
-          if (textureId != 0) {
-            glDeleteTextures(1, &textureId);
+    if (wl_display_prepare_read(wl.display) != 0) {
+      wl_display_dispatch_pending(wl.display);
+      continue;
+    }
+    wl_display_flush(wl.display);
+    int ret = poll(fds, 2, 8);
+
+    if (ret > 0) {
+      // wayland event happend
+      if (fds[0].revents & POLLIN) {
+        wl_display_read_events(wl.display);
+        did_read = 1;
+      }
+      
+      // socket event happend
+      if (fds[1].revents & POLLIN) {
+        int client = accept(daemon_sock, NULL, NULL);
+        if (client != -1) {
+          char buff[1024];
+          int n = read(client, buff, sizeof(buff)-1);
+          close(client);
+          if (n > 0) {
+            buff[n] = '\0';
+            char *path = NULL;
+            char *tok = strtok(buff, " ");
+
+            while (tok) {
+              if (strcmp(tok, "img") == 0) {
+                tok = strtok(NULL, " ");
+                if (tok) {
+                  path = tok;
+                }
+              }
+              else if (strcmp(tok, "speed") == 0) {
+                 tok = strtok(NULL, " ");
+                 if (tok) {
+                   speed = strtof(tok, NULL);
+                   if (speed <= 0.00) speed = 0.00f;
+                   if (speed >= 1.00) speed = 1.00f;
+                 }
+              }
+              tok = strtok(NULL, " ");
+            }
+
+            if (path && strcmp(path, wallpath) != 0) {
+              snprintf(wallpath, sizeof(wallpath), "%s",path);
+              if (textureId != 0) {
+                glDeleteTextures(1, &textureId);
+              }
+              textureId = loadImageIntoGPU(wallpath, &img_w, &img_h, textureId);
+              cache_wallpaper(wallpath);
+              gl_draw(&wl, &gl, texloc, textureId);
+            }
           }
-          textureId = loadImageIntoGPU(wallpath, &img_w, &img_h, textureId);
-          cache_wallpaper(wallpath);
         }
       }
+    }
+    if (!did_read) {
+      wl_display_cancel_read(wl.display);
     }
     // render only if the focus is on wallpaper for cpu / gpu efficiency
     if (wl.run) {
       gl_draw(&wl, &gl, texloc, textureId);
     }
-    wl_display_dispatch(wl.display);
   }
   close(daemon_sock);
   unlink(SOCK_PATH);

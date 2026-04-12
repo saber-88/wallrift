@@ -36,7 +36,7 @@ typedef struct {
 
   double target_cursor;
   double cursor_x;
-  int configured, width, height;
+  int configured, width, height , wayland_fd;
   unsigned int run;
 
 } WL;

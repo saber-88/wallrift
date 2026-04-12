@@ -13,10 +13,13 @@
 
 void printHelp(){
   printf("\033[1mwallrift - A smooth parllax supported wallpaper engine\033[0m.\n\n");
-  printf("\033[1m\033[4mUsage\033[0m: \033[1mwallrift [command] [value]\033[0m\n\n");
-  printf("\033[1m\033[04mCommands\033[0m: \n\n");
+  printf("\033[1m\033[4mUsage\033[0m: \033[1mwallrift <COMMAND>\033[0m\n\n");
+  printf("\033[1m\033[04mCommands:\033[0m \n\n");
   printf("  \033[1mimg\033[0m      sends the path of the wallpaper to the daemon.\n");
   printf("  \033[1mspeed\033[0m    sets the speed for parllax. Lower speed = smooth interpolation.\n");
+
+  printf("\033[1m\033[04mOptions:\033[0m \n\n");
+  printf("  \033[1m-h,--help\033[0m     prints this help message.\n");
 }
 
 int main(int argc, char *argv[])
@@ -34,6 +37,10 @@ int main(int argc, char *argv[])
     }
     else if (strcmp("speed", argv[i]) == 0 && (i + 1) <= argc) {
       speed = strtof(argv[++i], NULL);
+    }
+    else if (strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
+      printHelp();
+      break;
     }
   }
   
