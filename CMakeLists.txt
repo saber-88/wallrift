@@ -7,6 +7,9 @@ include_directories(include)
 
 add_executable(wallrift-daemon
     src/daemon.c
+    src/file.c
+    src/wayland.c
+    src/gl.c
     src/zwlr-layer-shell-protocol.c
     src/xdg-shell-protocol.c
 )
@@ -22,6 +25,9 @@ target_link_libraries(wallrift-daemon
 
 add_executable(wallrift
     src/cli.c
+    src/file.c
+    src/wayland.c
+    src/gl.c
     src/zwlr-layer-shell-protocol.c
     src/xdg-shell-protocol.c
 )
@@ -29,6 +35,7 @@ add_executable(wallrift
 target_link_libraries(wallrift
     wayland-client
     wayland-egl
+    wayland-cursor
     EGL
     GLESv2
     m
