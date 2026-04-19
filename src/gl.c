@@ -12,6 +12,7 @@
  * x , y are display cooridantes with (0,0) as centre.
  * z , w are image coordinates with (0,0)  as bottom left.
 */
+
 float vertices[] = {
     -1.0f, -1.0f, 0.0f, 1.0f,
     1.0f, -1.0f, 1.0f, 1.0f,
@@ -20,8 +21,8 @@ float vertices[] = {
 };
 
 // these are the indices to draw vertices in the given order
-unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
 
+unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
 
 GLuint createShader(GLenum type, const char *shaderSrc) {
   GLuint shader = glCreateShader(type);
@@ -77,11 +78,13 @@ GLuint createProgram(const char *vFilePath, const char *fFilePath) {
     glGetProgramInfoLog(prog, 512, NULL, infoLog);
     fprintf(stderr,"[ERR][LINKING] :%s\n", infoLog);
   }
+  glDetachShader(prog, vs);
+  glDetachShader(prog, fs);
   glDeleteShader(vs);
   glDeleteShader(fs);
   return prog;
 }
-GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int* imageHeight, GLuint texID) {
+GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight, GLuint texID) {
 
   char expanded[1024];
   if (imgPath[0] == '~') {
@@ -123,16 +126,24 @@ void gl_draw(APP *app, Monitor *m){
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(app->gl.prog);
-    if (app->gl.prog == 0) {
-      printf("program failed\n");
-    }
+  
+
     glActiveTexture(GL_TEXTURE0);
+    int resLoc = glGetUniformLocation(app->gl.prog, "resolution");
+    glUniform2f(resLoc, m->width, m->height);
+    int imgLoc = glGetUniformLocation(app->gl.prog, "imgSize");
+    glUniform2f(imgLoc, m->img_w, m->img_h);
+
     glBindTexture(GL_TEXTURE_2D, m->textureId);
     glUniform1i(app->gl.texLoc, 0);
 
+    glBindBuffer(GL_ARRAY_BUFFER, app->gl.vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, app->gl.ebo);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+
     // update mouse constatnly for parallax
     m->cursor_x += (m->target_cursor - m->cursor_x) * app->gl.speed;
-    printf("cursor :%f\n",m->cursor_x);
 
     glUniform1f(app->gl.cursorLoc, m->cursor_x);
     glUniform1f(app->gl.imgWLoc, (float)m->img_w);
@@ -154,15 +165,9 @@ int setupOpenGL(APP *app){
     fprintf(stderr,"\n[ERR][GL]: Failed to create program.\n");
     return 1;
   }
+
   printf("program created %d\n",app->gl.prog);
-  //
-  // if ((gl->prog =
-  //     createProgram("/home/karmveer/.coding/wallrift/shaders/wallpaper.vert",
-  //                   "/home/karmveer/.coding/wallrift/shaders/wallpaper.frag")) == -1) {
-  //
-  //   fprintf(stderr,"\n[ERR][GL]: Failed to create program.\n");
-  //   return 1;
-  // }
+
   app->gl.cursorLoc = glGetUniformLocation(app->gl.prog, "u_cursor");
   app->gl.imgWLoc = glGetUniformLocation(app->gl.prog, "u_img_width");
   app->gl.imgHLoc = glGetUniformLocation(app->gl.prog, "u_img_height");
@@ -181,10 +186,10 @@ int setupOpenGL(APP *app){
 
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
-
-  int resLoc = glGetUniformLocation(app->gl.prog, "resolution");
-  glUniform2f(resLoc, app->active_monitor->width, app->active_monitor->height);
-  int imgLoc = glGetUniformLocation(app->gl.prog, "imgSize");
-  glUniform2f(imgLoc, app->active_monitor->img_w, app->active_monitor->img_h);
+  //
+  // int resLoc = glGetUniformLocation(app->gl.prog, "resolution");
+  // glUniform2f(resLoc, app->active_monitor->width, app->active_monitor->height);
+  // int imgLoc = glGetUniformLocation(app->gl.prog, "imgSize");
+  // glUniform2f(imgLoc, app->active_monitor->img_w, app->active_monitor->img_h);
   return 0;
 }

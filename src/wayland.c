@@ -4,6 +4,7 @@
 #include "monitor.h"
 #include "zwlr-layer-shell-unstable-v1-protocol.h"
 #include <EGL/egl.h>
+#include <GL/gl.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <wayland-client-protocol.h>
@@ -73,16 +74,45 @@ static void registry_remove(void *data, struct wl_registry *registry,
   for (int i = 0; i < app->monitor_count; i++) {
     if (app->monitors[i].global_name == id) {
         Monitor *m = &app->monitors[i];
+        if (app->active_monitor == m) {
+          app->active_monitor =  NULL;     
 
-        eglDestroySurface(app->egl.egl_display, m->egl_surface);
-        zwlr_layer_surface_v1_destroy(m->layer_surface);
-        wl_surface_destroy(m->surface);
-        wl_output_destroy(m->output);
+          for (int j = 0; j < app->monitor_count; j++) {
+            if (j != i) {
+              app->active_monitor = &app->monitors[j];
+              break;
+            }
+          }
+        }
+        if (m->frame_cb) {
+          wl_callback_destroy(m->frame_cb);
+          m->frame_cb = NULL;
+        }
+        if (m->egl_surface != EGL_NO_SURFACE) {
+          eglDestroySurface(app->egl.egl_display, m->egl_surface);
+          m->egl_surface = EGL_NO_SURFACE;
+        }
+        if (m->layer_surface) {
+          zwlr_layer_surface_v1_destroy(m->layer_surface);
+          m->layer_surface = NULL;
+        }
+        if (m->surface) {
+          wl_surface_destroy(m->surface);
+          m->surface = NULL;
+        }
+        if (m->output) {
+          wl_output_destroy(m->output);
+          m->output = NULL;
+        }
+        if (m->textureId != 0) {
+          glDeleteTextures(1, &m->textureId);
+        }
 
         for (int j = i; j < app->monitor_count - 1; j++) {
           app->monitors[j] = app->monitors[j+1];
         }
         app->monitor_count--;
+        
         break;
     }
   }
@@ -102,9 +132,6 @@ static void layer_configure(void* data, struct zwlr_layer_surface_v1 *surface, u
 }
 
 static void layer_closed(void *data, struct zwlr_layer_surface_v1 *surface){
-  Monitor *m = (Monitor *)data;
-  APP *app = m->app;
-  zwlr_layer_surface_v1_destroy(surface);
 }
 
 // layer-shell surface listener 
@@ -118,6 +145,7 @@ static const struct zwlr_layer_surface_v1_listener layer_listener= {
 static void pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t sx, wl_fixed_t sy){
   APP *app = (APP *)data;
   if (!app->active_monitor) {
+    printf("[ERR][MONITOR]: No acitve monitor found\n");
     return;
   }
   app->active_monitor->target_cursor = wl_fixed_to_double(sx);
@@ -134,10 +162,11 @@ static void pointer_enter(void *data, struct wl_pointer *pointer,
   APP *app = (APP *)data;
   Monitor *m = find_monitor_by_surface(app, surface);
   if (!m) {
+    printf("[ERR][MONITOR]: No monitor found by surface\n");
     return;
   }
-  m->pointer_inside = 1;
   app->active_monitor = m;
+  m->pointer_inside = 1;
 
   if (!m->pending_frame) {
       m->frame_cb = wl_surface_frame(m->surface);
@@ -145,6 +174,7 @@ static void pointer_enter(void *data, struct wl_pointer *pointer,
       m->pending_frame = 1;
       wl_surface_commit(m->surface);
   }
+
   m->target_cursor = wl_fixed_to_double(sx);
 
   float normalized = m->target_cursor / m->width;
@@ -196,14 +226,15 @@ static const struct wl_pointer_listener pointer_listener = {
 static void frame_done(void *data, struct wl_callback *cb, uint32_t time){
   
   wl_callback_destroy(cb);
-  
   Monitor *m = (Monitor *)data;
-
   m->pending_frame = 0;
+  
+  gl_draw(m->app, m);
+  wl_surface_commit(m->surface);
 
   if (m->pointer_inside) {
     
-    gl_draw(m->app, m);
+    // gl_draw(m->app, m);
 
     m->frame_cb = wl_surface_frame(m->surface); 
     wl_callback_add_listener(m->frame_cb, &frame_listener, m);
@@ -257,6 +288,10 @@ void setupSurface(APP *app, Monitor *m){
 
   // getting surfaces and mouse pointer
   m->surface = wl_compositor_create_surface(app->wl.compositor);
+  if (!m->surface) {
+    fprintf(stderr, "[ERR][WL]: compositor failed to create surface for monitor : %d\n",m->global_name);
+    return;
+  }
   
   // getting layer shell surface
   m->layer_surface =
@@ -269,7 +304,8 @@ void setupSurface(APP *app, Monitor *m){
                                    ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
                                    ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
 
-  zwlr_layer_surface_v1_set_size(m->layer_surface, 0, 0);
+  zwlr_layer_surface_v1_set_size(m->layer_surface, m->width, m->height);
+
   // trying to bypass all the exclusive zones
   zwlr_layer_surface_v1_set_exclusive_zone(m->layer_surface, -1);
 
@@ -287,9 +323,8 @@ void setupSurface(APP *app, Monitor *m){
   wl_callback_add_listener(m->frame_cb, &frame_listener, m);
   wl_surface_commit(m->surface);
   m->pending_frame  = 1;
-
-  printf("\n\n%s %d\n", "[INFO]: Display Width = ", m->width);
-  printf("%s %d\n\n", "[INFO]: Display Height = ", m->height);
+  printf("[INFO]: Monitor %d Display Width  = %d\n", m->global_name, m->width);
+  printf("[INFO]: Monitor %d Display Height = %d\n", m->global_name, m->height);
 }
 
 void setupEGLGlobal(APP *app){
@@ -309,16 +344,18 @@ app->egl.egl_display = eglGetDisplay((EGLNativeDisplayType)app->wl.display);
 
   EGLConfig config;
   EGLint num_configs;
+
   if (!eglChooseConfig(app->egl.egl_display, attributes, &config, 1, &num_configs) || num_configs < 1) {
     fprintf(stderr,"\n[ERR][EGL]: Can't get egl config\n");
   }
+
+  eglBindAPI(EGL_OPENGL_ES_API);
+
   app->egl.egl_config = config;
-
-
   app->egl.egl_context = eglCreateContext(app->egl.egl_display, app->egl.egl_config, EGL_NO_CONTEXT, ctxAttribs);
 
   if (app->egl.egl_context == EGL_NO_CONTEXT) {
-      fprintf(stderr, "[ERR][EGL]: Failed to create context\n");
+      fprintf(stderr, "[ERR][EGL]: Failed to create egl context\n");
       exit(1);
   }
 }
@@ -327,8 +364,8 @@ void setupEGL(APP *app, Monitor *m){
   m->egl_window = wl_egl_window_create(m->surface, m->width, m->height);
 
   if (!m->egl_window) {
-      fprintf(stderr, "[ERR][EGL]: Failed to create egl window\n");
-      exit(1);
+    fprintf(stderr, "[ERR][EGL]: Failed to create egl window\n");
+    exit(1);
   }
   
   EGLint attributes[] =
@@ -337,14 +374,17 @@ void setupEGL(APP *app, Monitor *m){
     EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
     EGL_NONE
   };
+
   m->egl_surface = eglCreateWindowSurface(app->egl.egl_display, app->egl.egl_config, (EGLNativeWindowType)m->egl_window, NULL);
 
   if (m->egl_surface == EGL_NO_SURFACE) {
-      fprintf(stderr, "[ERR][EGL]: Failed to create surface\n");
+      fprintf(stderr, "[ERR][EGL]: Failed to create egl surface\n");
       exit(1);
   }
 
-  eglBindAPI(EGL_OPENGL_ES_API);
-
+  // eglBindAPI(EGL_OPENGL_ES_API);
+  if (!eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context)) {
+      fprintf(stderr,"\n[ERR][EGL]: eglMakeCurrent failed\n");
+    }
   // gl_draw(app, m);
 }

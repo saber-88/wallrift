@@ -39,6 +39,9 @@ static void registry_handler(void *data, struct wl_registry *registry,
                              uint32_t version);
 
 
+
+static const struct wl_callback_listener frame_listener;
+
 static void registry_remove(void *data, struct wl_registry *registry,
                             uint32_t id);
 

@@ -29,6 +29,7 @@
 #include "../include/file.h"
 
 #include "../include/app.h"
+#include "monitor.h"
 
 #define SOCK_PATH "/tmp/wallrift.sock"
 
@@ -111,7 +112,47 @@ void handleClient(int daemon_sock, char *wallpath, size_t wallSize, APP *app){
 }
 
 int main() {
+  
+  APP *app = calloc(1, sizeof(APP));
 
+  WLGlobal wl;
+  GL gl;
+  /* setting initial speed to 0.05 for smooth parallax
+   * i need to implement config file support soon so 
+   * that i can read from config file instead of 
+   * hardcoding values.
+   */
+  gl.speed = 0.05f;
+
+  app->wl = wl;
+  app->gl = gl;
+
+  setupWayland(app);
+  setupCursor(app);
+  setupEGLGlobal(app);
+  
+  // setting up surface and egl for each monitor
+  for (int i = 0; i < app->monitor_count; i++) {
+    setupSurface(app, &app->monitors[i]);
+    setupEGL(app, &app->monitors[i]);
+    printf("setup done for monitor %d, id %d\n",i,app->monitors[i].global_name);
+  }
+
+  /* making context current before opengGL setup
+   * because nvidia likes it this way
+   */
+
+  eglMakeCurrent(app->egl.egl_display, app->monitors[0].surface, app->monitors[0].surface,app->egl.egl_context);
+  
+  // setting up OpenGL
+  if (setupOpenGL(app)) {
+    fprintf(stderr, "[ERR][GL]: Failed to setup OpenGL\n");
+    return 1;
+  }
+  
+  app->gl.texLoc = glGetUniformLocation(app->gl.prog, "tex");
+
+  // loading cached wallpaper
   char wallpath[5000];
   const char* cached = get_cached_wallpaper();
   if (cached) {
@@ -120,45 +161,18 @@ int main() {
   else {
     wallpath[0] = '\0';
   }
-
   
-  APP *app = calloc(1, sizeof(APP));
-
-  WLGlobal wl;
-  GL gl;
-
-  app->wl = wl;
-  app->gl = gl;
-
-  setupWayland(app);
-  setupCursor(app);
-
-  setupSurface(app, app->active_monitor);
-  setupEGLGlobal(app);
-
+  // initially loading cached wallpaper for every monitor
   for (int i = 0; i < app->monitor_count; i++) {
-    setupEGL(app, &app->monitors[i]);
-    printf("setup done for monitor %d id %d\n",i,app->monitors[i].global_name);
+    Monitor *m = &app->monitors[i];
+    eglMakeCurrent(app->egl.egl_context, m->egl_surface, m->egl_surface, app->egl.egl_context);
+    m->textureId = loadImageIntoGPU(wallpath, &m->img_w, &m->img_h, m->textureId);
   }
   
-  // openGL stuff
-  app->active_monitor->textureId = 0;
-  app->gl.texLoc = glGetUniformLocation(app->gl.prog, "tex");
-
-  // load the cached wallpaper
-  if (wallpath[0] != '\0') {
-     app->active_monitor->textureId = loadImageIntoGPU(wallpath, &app->active_monitor->img_w , &app->active_monitor->img_h, app->active_monitor->textureId);
-     cache_wallpaper(wallpath);
+  // initially drawing cached wallpaper for every monitor
+  for (int i = 0; i < app->monitor_count; i++) {
+    gl_draw(app, &app->monitors[i]);
   }
-
-  if (setupOpenGL(app)) {
-    return 1;
-  }
-  
-  // drawing once to render cached wallpaper
-  gl_draw(app, app->active_monitor); 
-
-  // unix socket
 
   int daemon_sock = setupDaemonSocket();
   if (daemon_sock == -1) {
@@ -176,10 +190,9 @@ int main() {
   fds[1].events = POLLIN;
   int did_read = 0;
   
-  // render loop
-  //
-  while (1) {
 
+  // render loop
+  while (1) {
     did_read = 0;
     wl_display_dispatch_pending(app->wl.display);
 
