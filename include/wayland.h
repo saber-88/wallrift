@@ -33,44 +33,6 @@ typedef struct WLGlobal{
 
 Monitor * find_monitor_by_surface(APP* app, struct wl_surface *wl_surface);
 Monitor * find_monitor_by_layer_surface(APP* app, struct zwlr_layer_surface_v1 *ls);
-
-static void registry_handler(void *data, struct wl_registry *registry,
-                             uint32_t id, const char *interface,
-                             uint32_t version);
-
-
-
-static const struct wl_callback_listener frame_listener;
-
-static void registry_remove(void *data, struct wl_registry *registry,
-                            uint32_t id);
-
-
-static void layer_configure(void* data, struct zwlr_layer_surface_v1 *surface, uint32_t serial, uint32_t widht, uint32_t height);
-
-static void layer_closed(void *data, struct zwlr_layer_surface_v1 *surface);
-
-
-// pointer stuff
-static void pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t sx, wl_fixed_t sy);
-static void pointer_enter(void *data, struct wl_pointer *pointer,
-                          uint32_t serial, struct wl_surface *surface,
-                          wl_fixed_t sx, wl_fixed_t sy);
-
-static void pointer_leave(void *data, struct wl_pointer *pointer,
-                          uint32_t serial, struct wl_surface *surface); 
-
-static void pointer_button(void *data, struct wl_pointer *pointer,
-                           uint32_t serial, uint32_t time,
-                           uint32_t button, uint32_t state);
-
-static void pointer_axis(void *data, struct wl_pointer *pointer,
-                         uint32_t time, uint32_t axis, wl_fixed_t value);
-
-//frame callback stuff
-
-static void frame_done(void *data, struct wl_callback *cb, uint32_t time);
-
 void setupWayland(APP *app);
 void setupCursor(APP *app);
 void setupEGLGlobal(APP *app);

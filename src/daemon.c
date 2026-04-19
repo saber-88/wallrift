@@ -2,44 +2,38 @@
  author : github.com/saber-88
  */
 
-#include <bits/time.h>
 #include <fcntl.h>
 #include <EGL/egl.h>
 #include <EGL/eglplatform.h>
-#include <GL/gl.h>
-#include <GL/glext.h>
 #include <GLES2/gl2.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 #include <wayland-cursor.h>
 #include <wayland-egl.h>
-#include <time.h>
 
 #include "../include/wayland.h"
 #include "../include/gl.h"
 #include "../include/file.h"
-
+#include "log.h"
 #include "../include/app.h"
 #include "monitor.h"
 
 #define SOCK_PATH "/tmp/wallrift.sock"
 
-double get_time(){
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return  ts.tv_sec + ts.tv_nsec * 1e-9;
-}
+//forward declarations
+int setup_daemon_socket(void);
+void handle_client(int daemon_sock, APP *app);
+void load_wallpaper_for_monitor(APP *app, Monitor* m, const char *path);
 
-int setupDaemonSocket(){
+
+int setup_daemon_socket(void){
   int daemon_sock = socket(AF_UNIX, SOCK_STREAM, 0);
   if (daemon_sock == -1) {
     perror("Socket\n");
@@ -53,20 +47,32 @@ int setupDaemonSocket(){
   unlink(SOCK_PATH);
 
   if (bind(daemon_sock, (struct sockaddr*)&d_addr, sizeof(d_addr)) == -1) {
-    fprintf(stderr,"[ERR][SOCK]: Failed to bind socket!");
+    LOG_ERR ("SOCK",  "Failed to bind socket");
     close(daemon_sock);
     return -1;
   }
 
-  printf("[INFO]: Socket created\n");
+  LOG_INFO("SOCK",  "Socket created at %s", SOCK_PATH);
   listen(daemon_sock, 5);
-  printf("[INFO]: Listening...\n\n");
+
+  LOG_INFO("SOCK",  "Listening...");
   int flags = fcntl(daemon_sock, F_GETFL, 0);
   fcntl(daemon_sock, F_SETFL, flags | O_NONBLOCK);
   return daemon_sock;
 }
 
-void handleClient(int daemon_sock, char *wallpath, size_t wallSize, APP *app){
+void load_wallpaper_for_monitor(APP *app, Monitor* m, const char *path){
+  if (!path || path[0] == '\0') return;
+  eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context);
+  GLuint nexTex = loadImageIntoGPU((char *)path, &m->img_w, &m->img_h, m->textureId);
+  if (m->textureId != 0 && m->textureId != nexTex) {
+    glDeleteTextures(1, &m->textureId);
+  }
+  m->textureId = nexTex;
+  snprintf(m->wallpath, sizeof(m->wallpath), "%s", path);
+}
+
+void handle_client(int daemon_sock, APP *app){
   int client = accept(daemon_sock, NULL, NULL);
   if (client != -1) {
     char buff[1024];
@@ -91,41 +97,35 @@ void handleClient(int daemon_sock, char *wallpath, size_t wallSize, APP *app){
              if (app->gl.speed <= 0.00) app->gl.speed = 0.00f;
              if (app->gl.speed >= 1.00) app->gl.speed = 1.00f;
            }
-        }
+        } 
         tok = strtok(NULL, " ");
       }
 
-      if (path && strcmp(path, wallpath) != 0) {
-        snprintf(wallpath, wallSize, "%s",path);
-        GLuint nexTex = loadImageIntoGPU(wallpath, &app->active_monitor->img_w, &app->active_monitor->img_h, app->active_monitor->textureId);
-        cache_wallpaper(wallpath);
-        if (app->active_monitor->textureId != nexTex) {
-          if (app->active_monitor->textureId != 0) {
-            glDeleteTextures(1, &app->active_monitor->textureId);
-          }
-          app->active_monitor->textureId = nexTex;
-        }
+      if (path) {
+        Monitor *m = app->active_monitor;
+        if (!m){
+          LOG_WARN("DAEMON", "No active monitor");
+          return;
+        } 
+        if (strcmp(path, m->wallpath) == 0) return; 
+        load_wallpaper_for_monitor(app, m, path);
         gl_draw(app, app->active_monitor);
+        cache_wallpaper(path);
       }
     }
   }
 }
 
-int main() {
+int main(void) {
   
   APP *app = calloc(1, sizeof(APP));
 
-  WLGlobal wl;
-  GL gl;
   /* setting initial speed to 0.05 for smooth parallax
    * i need to implement config file support soon so 
    * that i can read from config file instead of 
    * hardcoding values.
    */
-  gl.speed = 0.05f;
-
-  app->wl = wl;
-  app->gl = gl;
+  app->gl.speed = 0.05f;
 
   setupWayland(app);
   setupCursor(app);
@@ -135,48 +135,46 @@ int main() {
   for (int i = 0; i < app->monitor_count; i++) {
     setupSurface(app, &app->monitors[i]);
     setupEGL(app, &app->monitors[i]);
-    printf("setup done for monitor %d, id %d\n",i,app->monitors[i].global_name);
+    LOG_INFO("DAEMON", "Setup done for monitor %d with id: %d",i,app->monitors[i].global_name);
   }
 
   /* making context current before opengGL setup
    * because nvidia likes it this way
    */
 
-  eglMakeCurrent(app->egl.egl_display, app->monitors[0].surface, app->monitors[0].surface,app->egl.egl_context);
+  eglMakeCurrent(app->egl.egl_display,
+                 app->monitors[0].egl_surface,
+                 app->monitors[0].egl_surface,
+                 app->egl.egl_context
+                );
   
   // setting up OpenGL
   if (setupOpenGL(app)) {
-    fprintf(stderr, "[ERR][GL]: Failed to setup OpenGL\n");
+    LOG_ERR("DAEMON","Failed to setup opengGL");
     return 1;
   }
   
   app->gl.texLoc = glGetUniformLocation(app->gl.prog, "tex");
 
-  // loading cached wallpaper
-  char wallpath[5000];
-  const char* cached = get_cached_wallpaper();
-  if (cached) {
-    snprintf(wallpath, sizeof(wallpath), "%s", cached);
-  }
-  else {
-    wallpath[0] = '\0';
-  }
   
   // initially loading cached wallpaper for every monitor
-  for (int i = 0; i < app->monitor_count; i++) {
-    Monitor *m = &app->monitors[i];
-    eglMakeCurrent(app->egl.egl_context, m->egl_surface, m->egl_surface, app->egl.egl_context);
-    m->textureId = loadImageIntoGPU(wallpath, &m->img_w, &m->img_h, m->textureId);
+  const char* cached = get_cached_wallpaper();
+  if (cached) {
+     for (int i = 0; i < app->monitor_count; i++) {
+       load_wallpaper_for_monitor(app, &app->monitors[i], cached);
+    }   
   }
+
   
   // initially drawing cached wallpaper for every monitor
   for (int i = 0; i < app->monitor_count; i++) {
     gl_draw(app, &app->monitors[i]);
   }
+  wl_display_flush(app->wl.display);
 
-  int daemon_sock = setupDaemonSocket();
+  int daemon_sock = setup_daemon_socket();
   if (daemon_sock == -1) {
-    fprintf(stderr, "[ERR][SOCK]: %s\n","Failed to setup daemon socket");
+    LOG_ERR("SOCK","Failed to setup daemon socket");
     return 1;
   }
 
@@ -201,7 +199,7 @@ int main() {
       continue;
     }
     wl_display_flush(app->wl.display);
-    int timeout = app->active_monitor->pointer_inside ? 0 : -1;
+    int timeout = app->active_monitor && app->active_monitor->pointer_inside ? 0 : -1;
     int ret = poll(fds, 2, timeout);
 
     if (ret > 0) {
@@ -213,7 +211,7 @@ int main() {
       
       // socket event happend
       if (fds[1].revents & POLLIN) {
-        handleClient(daemon_sock, wallpath, sizeof(wallpath), app);
+        handle_client(daemon_sock, app);
       }
     }
     if (!did_read) {

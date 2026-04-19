@@ -1,8 +1,11 @@
 #include "gl.h"
+#include "log.h"
 #include "monitor.h"
 #include "wayland.h"
 #include "file.h"
 #include "app.h"
+#include <GL/gl.h>
+#include <GL/glext.h>
 #include <GLES2/gl2.h>
 #include <stdio.h>
 #define STB_IMAGE_IMPLEMENTATION
@@ -33,8 +36,8 @@ GLuint createShader(GLenum type, const char *shaderSrc) {
   glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     glGetShaderInfoLog(shader, 512, NULL, infoLog);
-    fprintf(stderr,"[ERR][SHADER]: %s\n", infoLog);
-    return -1;
+    LOG_ERR("GL", "Failed to compile shader: %s",infoLog);
+    return 0;
   }
   return shader;
 }
@@ -43,40 +46,36 @@ GLuint createProgram(const char *vFilePath, const char *fFilePath) {
   const char *vsrc = readFile(vFilePath);
   const char *fsrc = readFile(fFilePath);
   if (!vsrc || !fsrc) {
-    fprintf(stderr,"[ERR][FILE]: %s\n", "Failed to open shader file.");
+    LOG_ERR("GL", "Failed to open shader file");
     free((void*)vsrc);
     free((void*)fsrc);
-    return -1;
+    return 0;
   }
+
   GLuint vs = createShader(GL_VERTEX_SHADER, vsrc);
   GLuint fs = createShader(GL_FRAGMENT_SHADER, fsrc);
-  int success;
+  GLint success;
   char infoLog[512];
 
-  if (vs == -1 || fs == -1) {
-    fprintf(stderr,"[ERR][SHADER]: %s\n", "Failed to create shader.");
+  if (vs == 0 || fs == 0) {
+    LOG_ERR("GL", "Failed to create shader.");
     free((void*)vsrc);
     free((void*)fsrc);
     return -1;
   }
   GLuint prog = glCreateProgram();
-  glGetProgramiv(prog, GL_PROGRAM, &success);
-  if (!success) {
-    glGetProgramInfoLog(prog, 512, NULL, infoLog);
-    fprintf(stderr,"[ERR][PROGRAM] :%s\n", infoLog);
-  }
   glAttachShader(prog, vs);
   glAttachShader(prog, fs);
   glLinkProgram(prog);
+  glGetProgramiv(prog, GL_LINK_STATUS, &success);
 
   free((void *)vsrc);
   free((void *)fsrc);
 
- 
   glGetProgramiv(prog, GL_LINK_STATUS, &success);
-  if (!success) {
+  if (success != GL_TRUE) {
     glGetProgramInfoLog(prog, 512, NULL, infoLog);
-    fprintf(stderr,"[ERR][LINKING] :%s\n", infoLog);
+    LOG_ERR("GL", "Failed to link program: %s",infoLog);
   }
   glDetachShader(prog, vs);
   glDetachShader(prog, fs);
@@ -89,7 +88,6 @@ GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight, GLuint
   char expanded[1024];
   if (imgPath[0] == '~') {
     snprintf(expanded, sizeof(expanded), "%s%s", getenv("HOME"), &imgPath[1]);
-    printf("%s", expanded);
   }
   else {
     snprintf(expanded, sizeof(expanded), "%s", imgPath);
@@ -97,7 +95,7 @@ GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight, GLuint
   int channels;
   unsigned char *pixels = stbi_load(expanded, imageWidth, imageHeight, &channels, 4);
   if (!pixels) {
-    fprintf(stderr,"\n[ERR][STB]: Cannot load image\n");
+    LOG_ERR("GL", "Failed to load image");
     return texID;
   }
 
@@ -111,22 +109,21 @@ GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight, GLuint
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
   stbi_image_free(pixels);
-  printf("[INFO]: %s loaded in GPU\n",expanded);
-  printf("[INFO]: Img width = %d\n[INFO]: Img height = %d\n\n", *imageWidth, *imageHeight);
+  LOG_INFO("GL","%s loaded in GPU", expanded);
+  LOG_INFO("GL",    "Image size: %dx%d", *imageWidth, *imageHeight);
   return texID;
 }
 
 void gl_draw(APP *app, Monitor *m){
 
     if (!eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context)) {
-      fprintf(stderr,"\n[ERR][EGL]: eglMakeCurrent failed\n");
+      LOG_ERR("GL", "eglMakeCurrent failed");
     }
 
     glViewport(0, 0, m->width, m->height);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(app->gl.prog);
-  
 
     glActiveTexture(GL_TEXTURE0);
     int resLoc = glGetUniformLocation(app->gl.prog, "resolution");
@@ -156,17 +153,14 @@ void gl_draw(APP *app, Monitor *m){
 }
 
 int setupOpenGL(APP *app){
- 
 
   if ((app->gl.prog =
       createProgram("/usr/share/wallrift/shaders/wallpaper.vert",
-                    "/usr/share/wallrift/shaders/wallpaper.frag")) == -1) {
+                    "/usr/share/wallrift/shaders/wallpaper.frag")) == 0) {
 
-    fprintf(stderr,"\n[ERR][GL]: Failed to create program.\n");
+    LOG_ERR("GL", "Failed to create program");
     return 1;
   }
-
-  printf("program created %d\n",app->gl.prog);
 
   app->gl.cursorLoc = glGetUniformLocation(app->gl.prog, "u_cursor");
   app->gl.imgWLoc = glGetUniformLocation(app->gl.prog, "u_img_width");
@@ -186,10 +180,6 @@ int setupOpenGL(APP *app){
 
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
-  //
-  // int resLoc = glGetUniformLocation(app->gl.prog, "resolution");
-  // glUniform2f(resLoc, app->active_monitor->width, app->active_monitor->height);
-  // int imgLoc = glGetUniformLocation(app->gl.prog, "imgSize");
-  // glUniform2f(imgLoc, app->active_monitor->img_w, app->active_monitor->img_h);
+
   return 0;
 }

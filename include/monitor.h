@@ -25,10 +25,12 @@ typedef struct Monitor {
     struct wl_callback *frame_cb;
 
     int pointer_inside;
-    double cursor_x, cursor_y;
+    double cursor_x;
     double target_cursor;
 
     GLuint textureId;
     int img_w, img_h;
     uint32_t global_name;
+    char wallpath[5000];
+
 } Monitor;
