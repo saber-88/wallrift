@@ -60,16 +60,26 @@ int setup_daemon_socket(void){
   fcntl(daemon_sock, F_SETFL, flags | O_NONBLOCK);
   return daemon_sock;
 }
-
-void load_wallpaper_for_monitor(APP *app, Monitor* m, const char *path){
+void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path) {
   if (!path || path[0] == '\0') return;
+
   eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context);
-  GLuint nexTex = loadImageIntoGPU((char *)path, &m->img_w, &m->img_h, m->textureId);
-  if (m->textureId != 0 && m->textureId != nexTex) {
+
+  int new_w = 0, new_h = 0;
+  GLuint nextTex = loadImageIntoGPU((char*)path, &new_w, &new_h, m->textureId);
+
+  if (new_w == 0 || new_h == 0) {
+    LOG_ERR("GL", "Failed to load image: %s", path);
+    return;
+  }
+
+  if (m->textureId != 0 && m->textureId != nextTex) {
     glDeleteTextures(1, &m->textureId);
   }
-  m->textureId = nexTex;
-  snprintf(m->wallpath, sizeof(m->wallpath), "%s", path);
+  m->textureId = nextTex;
+  m->img_w = new_w;
+  m->img_h = new_h;
+  snprintf(m->wallpath, sizeof(m->wallpath), "%s", path); 
 }
 
 void handle_client(int daemon_sock, APP *app){

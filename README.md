@@ -38,7 +38,7 @@ Wallrift is composed of two main components:
 ### AUR (Recommended)
 
 ```bash
-yay -S wallrift-git
+yay -S wallrift
 ```
 
 ### Manual Build
@@ -138,7 +138,7 @@ Wallrift uses a Unix domain socket for IPC:
 
 - [ ] Memory optimization  
 - [ ] Smooth transitions  
-- [ ] Multi-monitor support  
+- [✅] Multi-monitor support  
 - [ ] Animated wallpapers  
 - [ ] Config file support  
 
