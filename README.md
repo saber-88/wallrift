@@ -138,7 +138,7 @@ Wallrift uses a Unix domain socket for IPC:
 
 - [ ] Memory optimization  
 - [ ] Smooth transitions  
-- [✅] Multi-monitor support  
+- [x] Multi-monitor support  
 - [ ] Animated wallpapers  
 - [ ] Config file support  
 

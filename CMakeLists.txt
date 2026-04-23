@@ -18,6 +18,7 @@ add_executable(wallrift-daemon
     src/gl.c
     src/zwlr-layer-shell-protocol.c
     src/xdg-shell-protocol.c
+    src/ext-idle-notify-v1-protocol.c
 )
 
 target_include_directories(wallrift-daemon PRIVATE include)

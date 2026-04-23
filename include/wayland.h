@@ -2,6 +2,7 @@
 
 #include "monitor.h"
 #include "zwlr-layer-shell-unstable-v1-protocol.h"
+#include "ext-idle-notify-v1-client-protocol.h"
 #include <EGL/egl.h>
 #include <stdint.h>
 #include <sys/stat.h>
@@ -26,8 +27,12 @@ typedef struct WLGlobal{
   struct wl_cursor_theme *cursor_theme;
   struct wl_surface *cursor_surface;
   struct wl_shm* shm;
-
+  struct ext_idle_notifier_v1 *notifier;  
+  struct ext_idle_notification_v1 *notification;  
+  double last_cursor_x;
+  double last_cursor_y;
   int wayland_fd;
+  int cursor_moved;
 
 } WLGlobal;
 

@@ -1,4 +1,5 @@
 #include "wayland.h"
+#include "ext-idle-notify-v1-client-protocol.h"
 #include "file.h"
 #include "gl.h"
 #include "app.h"
@@ -13,8 +14,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <wayland-egl-core.h>
+#include <wayland-util.h>
 #include <wlr-layer-shell-unstable-v1-client-protocol.h>
 #include "log.h"
+
 static void frame_done(void *data, struct wl_callback *cb, uint32_t time);
 
 Monitor* find_monitor_by_surface(APP *app, struct wl_surface* surface){
@@ -57,6 +60,10 @@ static void registry_handler(void *data, struct wl_registry *registry,
   }
   else if (!strcmp(interface, "wl_shm")) {
     app->wl.shm = wl_registry_bind(registry, id, &wl_shm_interface, 1);
+  }
+  else if (!strcmp(interface, "ext_idle_notifier_v1")) {
+    app->wl.notifier = wl_registry_bind(registry, id, &ext_idle_notifier_v1_interface, 1);
+
   }
   else if (!strcmp(interface, "wl_output")) {
     Monitor *m = &app->monitors[app->monitor_count++];
@@ -150,6 +157,35 @@ static void layer_configure(void* data, struct zwlr_layer_surface_v1 *surface, u
   zwlr_layer_surface_v1_ack_configure(surface, serial);
 }
 
+
+static void on_idle(void *data, struct ext_idle_notification_v1 *notif){
+  (void)notif;
+  APP *app = (APP *)data;
+  app->wl.cursor_moved = 0;
+  printf("Stale cursor\n");
+
+};
+
+static void on_resume(void *data, struct ext_idle_notification_v1 *notif){
+  (void)notif;
+  APP *app = (APP *)data;
+  Monitor *m = app->active_monitor;
+  app->wl.cursor_moved = 1;
+  printf("resumed\n");
+
+  if (!m->pending_frame) {
+      m->frame_cb = wl_surface_frame(m->surface);
+      wl_callback_add_listener(m->frame_cb, &frame_listener, m);
+      m->pending_frame = 1;
+      wl_surface_commit(m->surface);
+  }
+};
+
+static const struct ext_idle_notification_v1_listener idle_notif_listener = {
+  .idled = on_idle,
+  .resumed = on_resume,
+};
+
 static void layer_closed(void *data, struct zwlr_layer_surface_v1 *surface){
   (void)data;
   (void)surface;
@@ -173,7 +209,13 @@ static void pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time
     LOG_WARN("WL","No active monitor found");
     return;
   }
-  app->active_monitor->target_cursor = wl_fixed_to_double(sx);
+
+  double cx = wl_fixed_to_double(sx);
+  double cy = wl_fixed_to_double(sy);
+
+  app->wl.last_cursor_x = cx;
+  app->wl.last_cursor_y = cy;
+  app->active_monitor->target_cursor = cx;
 
   float normalized = app->active_monitor->target_cursor / app->active_monitor->width;
   if (normalized < 0.0f) normalized = 0.0f;
@@ -192,7 +234,7 @@ static void pointer_enter(void *data, struct wl_pointer *pointer,
     return;
   }
   app->active_monitor = m;
-  m->pointer_inside = 1;
+  app->active_monitor->pointer_inside = 1;
 
   if (!m->pending_frame) {
       m->frame_cb = wl_surface_frame(m->surface);
@@ -277,7 +319,11 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time){
   if (!m->surface || !m->egl_surface) {
     return;
   }
-  
+  if (m->app->wl.cursor_moved == 0) {
+    printf("skip render\n");
+    return;
+  }
+
   gl_draw(m->app, m);
   wl_surface_commit(m->surface);
 
@@ -298,11 +344,15 @@ void setupWayland(APP *app){
   }
   app->wl.registry = wl_display_get_registry(app->wl.display);
   wl_registry_add_listener(app->wl.registry, &registry_listener, app);
+
   wl_display_roundtrip(app->wl.display);
   wl_display_roundtrip(app->wl.display);
 
   app->wl.pointer = wl_seat_get_pointer(app->wl.seat);
   wl_pointer_add_listener(app->wl.pointer, &pointer_listener, app);
+
+  app->wl.notification = ext_idle_notifier_v1_get_idle_notification(app->wl.notifier, 1000, app->wl.seat);
+  ext_idle_notification_v1_add_listener(app->wl.notification, &idle_notif_listener, app);
 }
 
 void setupCursor(APP *app){

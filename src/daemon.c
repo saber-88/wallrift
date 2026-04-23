@@ -198,7 +198,6 @@ int main(void) {
   fds[1].events = POLLIN;
   int did_read = 0;
   
-
   // render loop
   while (1) {
     did_read = 0;
@@ -209,7 +208,12 @@ int main(void) {
       continue;
     }
     wl_display_flush(app->wl.display);
-    int timeout = app->active_monitor && app->active_monitor->pointer_inside ? 0 : -1;
+    int timeout = -1;
+    if (app->active_monitor && app->active_monitor->pointer_inside) {
+      if (app->wl.cursor_moved) {
+        timeout = 0;
+      }
+    }
     int ret = poll(fds, 2, timeout);
 
     if (ret > 0) {
@@ -218,7 +222,6 @@ int main(void) {
         wl_display_read_events(app->wl.display);
         did_read = 1;
       }
-      
       // socket event happend
       if (fds[1].revents & POLLIN) {
         handle_client(daemon_sock, app);
@@ -228,6 +231,7 @@ int main(void) {
       wl_display_cancel_read(app->wl.display);
     }
   }
+
   close(daemon_sock);
   unlink(SOCK_PATH);
   return 0;
