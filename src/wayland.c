@@ -162,7 +162,7 @@ static void on_idle(void *data, struct ext_idle_notification_v1 *notif){
   (void)notif;
   APP *app = (APP *)data;
   app->wl.cursor_moved = 0;
-  printf("Stale cursor\n");
+  printf("Stole cursor\n");
 
 };
 
