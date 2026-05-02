@@ -43,5 +43,6 @@ void setupCursor(APP *app);
 void setupEGLGlobal(APP *app);
 void setupSurface(APP *app, Monitor* m);
 void setupEGL(APP *app, Monitor* m);
+void request_frame(Monitor *m);
 
 

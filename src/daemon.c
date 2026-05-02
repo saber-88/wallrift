@@ -66,19 +66,39 @@ void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path) {
   eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context);
 
   int new_w = 0, new_h = 0;
-  GLuint nextTex = loadImageIntoGPU((char*)path, &new_w, &new_h, m->textureId);
+  GLuint nextTex = loadImageIntoGPU((char*)path, &new_w, &new_h);
 
-  if (new_w == 0 || new_h == 0) {
+  if (nextTex == 0 || new_w == 0 || new_h == 0) {
     LOG_ERR("GL", "Failed to load image: %s", path);
     return;
   }
 
-  if (m->textureId != 0 && m->textureId != nextTex) {
-    glDeleteTextures(1, &m->textureId);
+  if (m->in_transition && m->old_texture_id != 0) {
+    glDeleteTextures(1, &m->old_texture_id);
+    m->old_texture_id = 0;
   }
-  m->textureId = nextTex;
+
+  if (m->new_texture_id != 0) {
+    m->old_texture_id = m->new_texture_id;
+    m->transition_required = 1;
+    m->in_transition = 1;
+    m->progress = 0.0f;
+  }
+  else {
+    m->old_texture_id  = nextTex;
+    m->transition_required = 0;
+    m->in_transition = 0;
+    m->progress = 1;
+  }
+
+  m->old_img_w = m->img_w; 
+  m->old_img_h = m->img_h; 
+
+  m->new_texture_id = nextTex;
+
   m->img_w = new_w;
   m->img_h = new_h;
+
   snprintf(m->wallpath, sizeof(m->wallpath), "%s", path); 
 }
 
@@ -119,7 +139,8 @@ void handle_client(int daemon_sock, APP *app){
         } 
         if (strcmp(path, m->wallpath) == 0) return; 
         load_wallpaper_for_monitor(app, m, path);
-        gl_draw(app, app->active_monitor);
+        request_frame(m);
+        // gl_draw(app, app->active_monitor);
         cache_wallpaper(path);
       }
     }
@@ -164,7 +185,7 @@ int main(void) {
     return 1;
   }
   
-  app->gl.texLoc = glGetUniformLocation(app->gl.prog, "tex");
+  // app->gl.texLoc = glGetUniformLocation(app->gl.prog, "u_old_tex");
 
   
   // initially loading cached wallpaper for every monitor

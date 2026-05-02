@@ -42,6 +42,14 @@ static const struct wl_callback_listener frame_listener = {
   .done = frame_done 
 };
 
+void request_frame(Monitor *m) {
+    if (!m->pending_frame) {
+        m->frame_cb = wl_surface_frame(m->surface);
+        wl_callback_add_listener(m->frame_cb, &frame_listener, m);
+        m->pending_frame = 1;
+        wl_surface_commit(m->surface);
+    }
+}
 
 static void registry_handler(void *data, struct wl_registry *registry,
                              uint32_t id, const char *interface,
@@ -79,11 +87,11 @@ static void registry_handler(void *data, struct wl_registry *registry,
     if (app->egl.egl_display != EGL_NO_DISPLAY && app->egl.egl_context != EGL_NO_CONTEXT) {
       setupSurface(app, m);
       setupEGL(app, m);
-      if (app->monitors[0].textureId != 0) {
+      if (app->monitors[0].new_texture_id != 0) {
         char* wall = (char *)get_cached_wallpaper();
         if (wall) {
           eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context);
-          m->textureId = loadImageIntoGPU(wall, &m->img_w, &m->img_h, 0);
+          m->new_texture_id = loadImageIntoGPU(wall, &m->img_w, &m->img_h);
         }
         gl_draw(app, m);
         LOG_INFO("WL", "Hotplugged monitor id: %d set up done",m->global_name);
@@ -130,8 +138,8 @@ static void registry_remove(void *data, struct wl_registry *registry,
           wl_output_destroy(m->output);
           m->output = NULL;
         }
-        if (m->textureId != 0) {
-          glDeleteTextures(1, &m->textureId);
+        if (m->new_texture_id != 0) {
+          glDeleteTextures(1, &m->new_texture_id);
         }
 
         for (int j = i; j < app->monitor_count - 1; j++) {
@@ -162,7 +170,7 @@ static void on_idle(void *data, struct ext_idle_notification_v1 *notif){
   (void)notif;
   APP *app = (APP *)data;
   app->wl.cursor_moved = 0;
-  LOG_INFO("WL", "Stale cursor");
+  LOG_INFO("WL", "cursor stopped moving");
 
 };
 
@@ -173,12 +181,8 @@ static void on_resume(void *data, struct ext_idle_notification_v1 *notif){
   app->wl.cursor_moved = 1;
   LOG_INFO("WL", "cursor moved");
 
-  if (!m->pending_frame) {
-      m->frame_cb = wl_surface_frame(m->surface);
-      wl_callback_add_listener(m->frame_cb, &frame_listener, m);
-      m->pending_frame = 1;
-      wl_surface_commit(m->surface);
-  }
+  request_frame(m);
+
 };
 
 static const struct ext_idle_notification_v1_listener idle_notif_listener = {
@@ -236,12 +240,7 @@ static void pointer_enter(void *data, struct wl_pointer *pointer,
   app->active_monitor = m;
   app->active_monitor->pointer_inside = 1;
 
-  if (!m->pending_frame) {
-      m->frame_cb = wl_surface_frame(m->surface);
-      wl_callback_add_listener(m->frame_cb, &frame_listener, m);
-      m->pending_frame = 1;
-      wl_surface_commit(m->surface);
-  }
+  request_frame(m);
 
   m->target_cursor = wl_fixed_to_double(sx);
 
@@ -319,18 +318,15 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time){
   if (!m->surface || !m->egl_surface) {
     return;
   }
-  if (m->app->wl.cursor_moved == 0) {
+  if (m->app->wl.cursor_moved == 0 && !m->in_transition) {
     return;
   }
 
   gl_draw(m->app, m);
   wl_surface_commit(m->surface);
 
-  if (m->pointer_inside) {
-    m->frame_cb = wl_surface_frame(m->surface); 
-    wl_callback_add_listener(m->frame_cb, &frame_listener, m);
-    wl_surface_commit(m->surface);
-    m->pending_frame = 1;
+  if (m->pointer_inside || m->in_transition) {
+    request_frame(m);
   }
 }
 
@@ -413,11 +409,11 @@ void setupSurface(APP *app, Monitor *m){
   while (!m->configured) {
     wl_display_dispatch(app->wl.display);
   }
-
-  m->frame_cb = wl_surface_frame(m->surface);
-  wl_callback_add_listener(m->frame_cb, &frame_listener, m);
-  wl_surface_commit(m->surface);
-  m->pending_frame  = 1;
+  request_frame(m);
+  // m->frame_cb = wl_surface_frame(m->surface);
+  // wl_callback_add_listener(m->frame_cb, &frame_listener, m);
+  // wl_surface_commit(m->surface);
+  // m->pending_frame  = 1;
   LOG_INFO("WL", "Monitor id: %d, width: %d, height: %d", m->global_name, m->width, m->height);
 }
 
