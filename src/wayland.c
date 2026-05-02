@@ -346,7 +346,7 @@ void setupWayland(APP *app){
   app->wl.pointer = wl_seat_get_pointer(app->wl.seat);
   wl_pointer_add_listener(app->wl.pointer, &pointer_listener, app);
 
-  app->wl.notification = ext_idle_notifier_v1_get_idle_notification(app->wl.notifier, 1000, app->wl.seat);
+  app->wl.notification = ext_idle_notifier_v1_get_idle_notification(app->wl.notifier, 3000, app->wl.seat);
   ext_idle_notification_v1_add_listener(app->wl.notification, &idle_notif_listener, app);
 }
 
@@ -410,10 +410,6 @@ void setupSurface(APP *app, Monitor *m){
     wl_display_dispatch(app->wl.display);
   }
   request_frame(m);
-  // m->frame_cb = wl_surface_frame(m->surface);
-  // wl_callback_add_listener(m->frame_cb, &frame_listener, m);
-  // wl_surface_commit(m->surface);
-  // m->pending_frame  = 1;
   LOG_INFO("WL", "Monitor id: %d, width: %d, height: %d", m->global_name, m->width, m->height);
 }
 

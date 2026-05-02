@@ -1,6 +1,7 @@
-/*
- author : github.com/saber-88
- */
+
+
+/// @author : github.com/saber-88
+
 
 #include <fcntl.h>
 #include <EGL/egl.h>
@@ -31,7 +32,21 @@
 int setup_daemon_socket(void);
 void handle_client(int daemon_sock, APP *app);
 void load_wallpaper_for_monitor(APP *app, Monitor* m, const char *path);
+void gl_set_transition(const char *name);
 
+typedef enum {
+  FADE = 0,
+  WIPE
+} TTYPE;
+TTYPE transition_t = FADE;
+
+void gl_set_transition(const char *name) {
+  if (strcmp(name, "fade") == 0) {
+    transition_t = FADE;
+  } else if (strcmp(name, "wipe") == 0) {
+    transition_t = WIPE;
+  } 
+}
 
 int setup_daemon_socket(void){
   int daemon_sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -114,18 +129,26 @@ void handle_client(int daemon_sock, APP *app){
       char *tok = strtok(buff, " ");
 
       while (tok) {
-        if (strcmp(tok, "img") == 0) {
+        if (strcmp(tok, "img") == 0 || strcmp(tok, "-i") == 0) {
           tok = strtok(NULL, " ");
           if (tok) {
             path = tok;
           }
         }
-        else if (strcmp(tok, "speed") == 0) {
+        else if (strcmp(tok, "speed") == 0 || strcmp(tok, "-s") == 0) {
            tok = strtok(NULL, " ");
            if (tok) {
              app->gl.speed = strtof(tok, NULL);
              if (app->gl.speed <= 0.00) app->gl.speed = 0.00f;
              if (app->gl.speed >= 1.00) app->gl.speed = 1.00f;
+           }
+        }
+        else if (strcmp(tok, "transition") == 0 || strcmp(tok, "-t") == 0) {
+           tok = strtok(NULL, " ");
+           if (tok) {
+              gl_set_transition(tok);
+              app->gl.transition_type = transition_t;
+              LOG_INFO("SOCK", "Got the transition : %s",tok);         
            }
         } 
         tok = strtok(NULL, " ");
@@ -140,7 +163,7 @@ void handle_client(int daemon_sock, APP *app){
         if (strcmp(path, m->wallpath) == 0) return; 
         load_wallpaper_for_monitor(app, m, path);
         request_frame(m);
-        // gl_draw(app, app->active_monitor);
+        wl_display_flush(app->wl.display);
         cache_wallpaper(path);
       }
     }
@@ -219,6 +242,7 @@ int main(void) {
   fds[1].events = POLLIN;
   int did_read = 0;
   
+  app->wl.cursor_moved = 1;
   // render loop
   while (1) {
     did_read = 0;
@@ -234,6 +258,9 @@ int main(void) {
       if (app->wl.cursor_moved) {
         timeout = 0;
       }
+    }
+    if (app->active_monitor->in_transition) {
+        timeout = 0;
     }
     int ret = poll(fds, 2, timeout);
 

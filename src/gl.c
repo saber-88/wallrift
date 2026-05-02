@@ -154,14 +154,14 @@ void gl_draw(APP *app, Monitor *m){
     glUniform1f(app->gl.viewHeightLoc, (float)m->height);
 
     if (m->transition_required && m->in_transition) {
-      m->progress += 0.01f;
+      m->progress += 0.007f;
       if (m->progress >= 1.0f) {
         m->progress = 1.0f;
         m->in_transition = 0;
       }
     }
     glUniform1f(app->gl.progress_loc, m->progress);
-
+    glUniform1i(app->gl.transition_loc, app->gl.transition_type);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     eglSwapBuffers(app->egl.egl_display, m->egl_surface);
 }
@@ -196,6 +196,7 @@ int setupOpenGL(APP *app){
   app->gl.new_tex_loc = glGetUniformLocation(app->gl.prog, "u_new_tex");
   app->gl.old_tex_loc = glGetUniformLocation(app->gl.prog, "u_old_tex");
   app->gl.progress_loc = glGetUniformLocation(app->gl.prog, "u_progress");
+  app->gl.transition_loc = glGetUniformLocation(app->gl.prog, "u_type");
 
   glUseProgram(app->gl.prog);
   glGenBuffers(1, &app->gl.vbo);

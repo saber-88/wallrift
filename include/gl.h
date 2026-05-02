@@ -21,10 +21,10 @@ typedef struct GL{
   int old_tex_loc;
   int new_tex_loc;
   int progress_loc;
+  int transition_loc;
+  int transition_type;
   float speed;
 } GL;
-
-
 
 GLuint createShader(GLenum type, const char *shaderSrc); 
 
