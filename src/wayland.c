@@ -321,6 +321,9 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time){
   if (m->app->wl.cursor_moved == 0 && !m->in_transition) {
     return;
   }
+  if (!m->pointer_inside && !m->in_transition) {
+    return;
+  }
 
   gl_draw(m->app, m);
   wl_surface_commit(m->surface);
