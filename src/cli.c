@@ -32,6 +32,11 @@ struct Command{
   float speed;
 };
 
+void printAvailableTransition(){
+  printf("\033[1mAvailable transitons:\033[0m\n");
+  printf("  \033[1mwipe\033[0m\n");
+  printf("  \033[1mfade\033[0m\n\n");
+}
 void printHelp(){
   printf("\033[1mwallrift - A smooth parallax supported wallpaper engine\033[0m.\n\n");
   printf("\033[1m\033[4mUsage\033[0m: \033[1mwallrift <COMMAND>\033[0m\n\n");
@@ -154,7 +159,7 @@ int validateTransition(char const* restrict string){
   {
     return EXIT_SUCCESS;
   }
-
+  
   return EXIT_FAILURE;
 };
 
@@ -261,6 +266,7 @@ int main(int argc, char *argv[]) {
             else {
                 command.transition_s = eError;
                 fprintf(stderr,"invalid argument for 'transition'. expected a valid transition!\n");
+                printAvailableTransition();
             }
         }
 
