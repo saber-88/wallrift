@@ -168,22 +168,15 @@ void gl_draw(APP *app, Monitor *m){
 
 int setupOpenGL(APP *app){
 
-  // if ((app->gl.prog =
-  //     createProgram("/usr/share/wallrift/shaders/wallpaper.vert",
-  //                   "/usr/share/wallrift/shaders/wallpaper.frag")) == 0) {
-  //
-  //   LOG_ERR("GL", "Failed to create program");
-  //   return 1;
-  // }
-  //
-  
   if ((app->gl.prog =
-      createProgram("/home/karmveer/.coding/wallrift/shaders/wallpaper.vert",
-                    "/home/karmveer/.coding/wallrift/shaders/wallpaper.frag")) == 0) {
+      createProgram("/usr/share/wallrift/shaders/wallpaper.vert",
+                    "/usr/share/wallrift/shaders/wallpaper.frag")) == 0) {
 
     LOG_ERR("GL", "Failed to create program");
     return 1;
   }
+
+  
   app->gl.cursorLoc = glGetUniformLocation(app->gl.prog, "u_cursor");
   app->gl.imgWidthLoc = glGetUniformLocation(app->gl.prog, "u_img_width");
   app->gl.imgHeightLoc = glGetUniformLocation(app->gl.prog, "u_img_height");
