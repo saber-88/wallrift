@@ -25,18 +25,27 @@ struct Command{
   enum State img_s;
   enum State speed_s;
   enum State query_s;
+  enum State transition_s;
   
   const char* path;
+  const char* transition;
   float speed;
 };
 
+void printAvailableTransition(){
+  printf("\033[1mAvailable transitons:\033[0m\n");
+  printf("  \033[1mwipe\033[0m\n");
+  printf("  \033[1mfade\033[0m\n");
+  printf("  \033[1mnone\033[0m\n\n");
+}
 void printHelp(){
   printf("\033[1mwallrift - A smooth parallax supported wallpaper engine\033[0m.\n\n");
   printf("\033[1m\033[4mUsage\033[0m: \033[1mwallrift <COMMAND>\033[0m\n\n");
   printf("\033[1m\033[04mCommands:\033[0m \n\n");
-  printf("  \033[1mimg\033[0m      sends the path of the wallpaper to the daemon.\n");
-  printf("  \033[1mspeed\033[0m    sets the speed for parallax. Lower speed = smooth interpolation.\n");
-  printf("  \033[1mquery\033[0m    prints the current applied wallpaper.\n");
+  printf("  \033[1mimg, -i\033[0m           sends the path of the wallpaper to the daemon.\n");
+  printf("  \033[1mspeed, -s\033[0m         sets the speed( 0.00 - 1.00 ) for parallax.\n");
+  printf("  \033[1mtransition, -t\033[0m    sets the transition type\n");
+  printf("  \033[1mquery, -q\033[0m         prints the current applied wallpaper.\n");
 
   printf("\033[1m\033[04m\nOptions:\033[0m \n\n");
   printf("  \033[1m-h,--help\033[0m     prints this help message.\n");
@@ -64,8 +73,26 @@ int handleSocket(struct Command command) {
   
     char cmd[1024] = {0};
     
-    if (command.img_s == eTrue && command.speed_s == eTrue) {
+    if (command.img_s == eTrue && command.speed_s == eTrue && command.transition_s == eTrue) {
+      int ret = snprintf(cmd, sizeof(cmd), "img %s speed %f transition %s", command.path, command.speed, command.transition);
+
+      if (ret < 0 || ret >= (int)sizeof(cmd)) {
+          fprintf(stderr, "command too long\n");
+          close(sock_fd);
+          return EXIT_FAILURE;
+      }
+    }
+    else if (command.img_s == eTrue && command.speed_s == eTrue ) {
       int ret = snprintf(cmd, sizeof(cmd), "img %s speed %f", command.path, command.speed);
+
+      if (ret < 0 || ret >= (int)sizeof(cmd)) {
+          fprintf(stderr, "command too long\n");
+          close(sock_fd);
+          return EXIT_FAILURE;
+      }
+    }
+    else if (command.img_s == eTrue && command.transition_s == eTrue ) {
+      int ret = snprintf(cmd, sizeof(cmd), "img %s transition %s", command.path, command.transition);
 
       if (ret < 0 || ret >= (int)sizeof(cmd)) {
           fprintf(stderr, "command too long\n");
@@ -75,6 +102,15 @@ int handleSocket(struct Command command) {
     }
     else if (command.img_s == eTrue) {
       int ret = snprintf(cmd, sizeof(cmd), "img %s", command.path);
+
+      if (ret < 0 || ret >= (int)sizeof(cmd)) {
+          fprintf(stderr, "command too long\n");
+          close(sock_fd);
+          return EXIT_FAILURE;
+      }
+    }
+    else if (command.transition_s == eTrue) {
+      int ret = snprintf(cmd, sizeof(cmd), "transition %s", command.transition);
 
       if (ret < 0 || ret >= (int)sizeof(cmd)) {
           fprintf(stderr, "command too long\n");
@@ -114,6 +150,20 @@ int handleSocket(struct Command command) {
     return EXIT_SUCCESS;
     
 }
+
+int validateTransition(char const* restrict string){
+  if
+      (
+        strcmp(string, "fade") == 0 || 
+        strcmp(string, "wipe") == 0 || 
+        strcmp(string, "none") == 0 
+      )
+  {
+    return EXIT_SUCCESS;
+  }
+  
+  return EXIT_FAILURE;
+};
 
 int validateFloat(char const* restrict string, float* outValue) {
     if (string == NULL || *string == '\0') {
@@ -164,11 +214,13 @@ int main(int argc, char *argv[]) {
       .img_s = eFalse,
       .speed_s = eFalse,
       .query_s = eFalse,
+      .transition_s = eFalse,
       .path = NULL,
-      .speed = 0.05f
+      .speed = 0.05f,
+      .transition = NULL
     };
 
-    for (size_t argsItr = {1}; argsItr < argc; ++argsItr) {
+    for (size_t argsItr = 1; argsItr < argc; ++argsItr) {
         
         char* argument = argv[argsItr];
         
@@ -177,7 +229,7 @@ int main(int argc, char *argv[]) {
             return EXIT_SUCCESS;
         }
         
-        else if (strcmp(argument, "img") == 0) {
+        else if (strcmp(argument, "img") == 0 || strcmp(argument, "-i") == 0) {
             if (command.img_s == eTrue) {
                 fprintf(stderr,"ignoring duplicate request: 'img'\n");
             }
@@ -191,7 +243,7 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        else if (strcmp(argument, "speed") == 0) {
+        else if (strcmp(argument, "speed") == 0 || strcmp(argument, "-s") == 0) {
             if (command.speed_s == eTrue) {
                 fprintf(stderr,"ignoring duplicate request: 'speed'\n");
             }
@@ -204,8 +256,23 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr,"invalid argument for 'speed'. expected a float!\n");
             }
         }
-        
-        else if (strcmp(argument, "query") == 0) {
+
+        else if (strcmp(argument, "transition") == 0 || strcmp(argument, "-t") == 0) {
+            if (command.transition_s == eTrue) {
+                fprintf(stderr,"ignoring duplicate request: 'transition'\n");
+            }
+            else if ((argsItr + 1 < argc) && validateTransition(argv[argsItr + 1]) == EXIT_SUCCESS) {
+                command.transition_s = eTrue;
+                command.transition = argv[++argsItr];
+            }
+            else {
+                command.transition_s = eError;
+                fprintf(stderr,"invalid argument for 'transition'. expected a valid transition!\n");
+                printAvailableTransition();
+            }
+        }
+
+        else if (strcmp(argument, "query") == 0 || strcmp(argument, "-q") == 0) {
             if (command.query_s == eTrue) {
                 printf("ignoring duplicate request: 'query'\n");
             }
@@ -220,12 +287,12 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    if ( command.img_s == eError || command.speed_s == eError ) {
+    if ( command.img_s == eError || command.speed_s == eError || command.transition_s == eError) {
         fprintf(stderr,"Exiting due to errors!");
         return EXIT_FAILURE;
     }
 
-    if (command.query_s == eTrue && (command.img_s == eTrue || command.speed_s == eTrue)) {
+    if (command.query_s == eTrue && (command.img_s == eTrue || command.speed_s == eTrue || command.transition_s == eTrue)) {
       fprintf(stderr, "query cannot be combined with other commands\n");
       return EXIT_FAILURE;
     }

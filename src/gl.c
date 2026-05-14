@@ -83,7 +83,7 @@ GLuint createProgram(const char *vFilePath, const char *fFilePath) {
   glDeleteShader(fs);
   return prog;
 }
-GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight, GLuint texID) {
+GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight) {
 
   char expanded[1024];
   if (imgPath[0] == '~') {
@@ -93,15 +93,15 @@ GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight, GLuint
     snprintf(expanded, sizeof(expanded), "%s", imgPath);
   }
   int channels;
+
   unsigned char *pixels = stbi_load(expanded, imageWidth, imageHeight, &channels, 4);
   if (!pixels) {
     LOG_ERR("GL", "Failed to load image");
-    return texID;
+    return 0;
   }
 
-  if (texID == 0) {
-    glGenTextures(1, &texID);
-  }
+  GLuint texID;
+  glGenTextures(1, &texID);
   glBindTexture(GL_TEXTURE_2D, texID);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, *imageWidth, *imageHeight, 0, GL_RGBA,
                GL_UNSIGNED_BYTE, pixels);
@@ -126,28 +126,44 @@ void gl_draw(APP *app, Monitor *m){
     glUseProgram(app->gl.prog);
 
     glActiveTexture(GL_TEXTURE0);
-    int resLoc = glGetUniformLocation(app->gl.prog, "resolution");
-    glUniform2f(resLoc, m->width, m->height);
-    int imgLoc = glGetUniformLocation(app->gl.prog, "imgSize");
-    glUniform2f(imgLoc, m->img_w, m->img_h);
+    glBindTexture(GL_TEXTURE_2D, m->old_texture_id);
+    glUniform1i(app->gl.old_tex_loc, 0);
 
-    glBindTexture(GL_TEXTURE_2D, m->textureId);
-    glUniform1i(app->gl.texLoc, 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m->new_texture_id);
+    glUniform1i(app->gl.new_tex_loc, 1);
 
     glBindBuffer(GL_ARRAY_BUFFER, app->gl.vbo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, app->gl.ebo);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
     glEnableVertexAttribArray(0);
 
+
     // update mouse constatnly for parallax
     m->cursor_x += (m->target_cursor - m->cursor_x) * app->gl.speed;
 
     glUniform1f(app->gl.cursorLoc, m->cursor_x);
-    glUniform1f(app->gl.imgWLoc, (float)m->img_w);
-    glUniform1f(app->gl.viewWLoc, (float)m->width);
-    glUniform1f(app->gl.imgHLoc, (float)m->img_h);
-    glUniform1f(app->gl.viewHLoc, (float)m->height);
+    glUniform1f(app->gl.imgWidthLoc, (float)m->img_w);
+    glUniform1f(app->gl.imgHeightLoc, (float)m->img_h);
 
+    glUniform1f(app->gl.oldImgWidthLoc, (float)m->old_img_w);
+    glUniform1f(app->gl.oldImgHeightLoc, (float)m->old_img_h);
+
+    glUniform1f(app->gl.viewWidthLoc, (float)m->width);
+    glUniform1f(app->gl.viewHeightLoc, (float)m->height);
+
+    if (m->transition_required && m->in_transition) {
+      // transition speed
+      m->progress += 0.01f;
+
+      if (m->progress >= 1.0f) {
+        m->progress = 1.0f;
+        m->in_transition = 0;
+      }
+    }
+    glUniform1f(app->gl.progress_loc, m->progress);
+    glUniform1i(app->gl.transition_loc, app->gl.transition_type);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     eglSwapBuffers(app->egl.egl_display, m->egl_surface);
 }
@@ -162,12 +178,21 @@ int setupOpenGL(APP *app){
     return 1;
   }
 
-  app->gl.cursorLoc = glGetUniformLocation(app->gl.prog, "u_cursor");
-  app->gl.imgWLoc = glGetUniformLocation(app->gl.prog, "u_img_width");
-  app->gl.imgHLoc = glGetUniformLocation(app->gl.prog, "u_img_height");
-  app->gl.viewWLoc = glGetUniformLocation(app->gl.prog, "u_view_width");
-  app->gl.viewHLoc = glGetUniformLocation(app->gl.prog, "u_view_height");
   
+  app->gl.cursorLoc = glGetUniformLocation(app->gl.prog, "u_cursor");
+  app->gl.imgWidthLoc = glGetUniformLocation(app->gl.prog, "u_img_width");
+  app->gl.imgHeightLoc = glGetUniformLocation(app->gl.prog, "u_img_height");
+
+  app->gl.oldImgWidthLoc = glGetUniformLocation(app->gl.prog, "u_old_img_width");
+  app->gl.oldImgHeightLoc = glGetUniformLocation(app->gl.prog, "u_old_img_height");
+
+  app->gl.viewWidthLoc = glGetUniformLocation(app->gl.prog, "u_view_width");
+  app->gl.viewHeightLoc = glGetUniformLocation(app->gl.prog, "u_view_height");
+  app->gl.new_tex_loc = glGetUniformLocation(app->gl.prog, "u_new_tex");
+  app->gl.old_tex_loc = glGetUniformLocation(app->gl.prog, "u_old_tex");
+  app->gl.progress_loc = glGetUniformLocation(app->gl.prog, "u_progress");
+  app->gl.transition_loc = glGetUniformLocation(app->gl.prog, "u_type");
+
   glUseProgram(app->gl.prog);
   glGenBuffers(1, &app->gl.vbo);
   glGenBuffers(1, &app->gl.ebo);
