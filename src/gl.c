@@ -154,7 +154,9 @@ void gl_draw(APP *app, Monitor *m){
     glUniform1f(app->gl.viewHeightLoc, (float)m->height);
 
     if (m->transition_required && m->in_transition) {
-      m->progress += 0.007f;
+      // transition speed
+      m->progress += 0.01f;
+
       if (m->progress >= 1.0f) {
         m->progress = 1.0f;
         m->in_transition = 0;

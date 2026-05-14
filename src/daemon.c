@@ -36,7 +36,8 @@ void gl_set_transition(const char *name);
 
 typedef enum {
   FADE = 0,
-  WIPE
+  WIPE,
+  NONE
 } TTYPE;
 TTYPE transition_t = FADE;
 
@@ -45,6 +46,9 @@ void gl_set_transition(const char *name) {
     transition_t = FADE;
   } else if (strcmp(name, "wipe") == 0) {
     transition_t = WIPE;
+  } 
+  else if (strcmp(name, "none") == 0) {
+    transition_t = NONE;
   } 
 }
 

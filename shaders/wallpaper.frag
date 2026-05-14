@@ -21,4 +21,7 @@ void main() {
       float alpha = smoothstep(pos - edge, pos + edge, vTex.x);
       gl_FragColor = mix(newColor, oldColor, alpha);
     }
+    else if(u_type == 2){ // none
+      gl_FragColor = newColor;
+    }
 }

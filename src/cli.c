@@ -35,7 +35,8 @@ struct Command{
 void printAvailableTransition(){
   printf("\033[1mAvailable transitons:\033[0m\n");
   printf("  \033[1mwipe\033[0m\n");
-  printf("  \033[1mfade\033[0m\n\n");
+  printf("  \033[1mfade\033[0m\n");
+  printf("  \033[1mnone\033[0m\n\n");
 }
 void printHelp(){
   printf("\033[1mwallrift - A smooth parallax supported wallpaper engine\033[0m.\n\n");
@@ -154,7 +155,8 @@ int validateTransition(char const* restrict string){
   if
       (
         strcmp(string, "fade") == 0 || 
-        strcmp(string, "wipe") == 0 
+        strcmp(string, "wipe") == 0 || 
+        strcmp(string, "none") == 0 
       )
   {
     return EXIT_SUCCESS;
