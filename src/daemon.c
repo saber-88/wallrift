@@ -92,27 +92,26 @@ void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path) {
     return;
   }
 
-  if (m->in_transition && m->old_texture_id != 0) {
+  if (m->old_texture_id != 0) {
     glDeleteTextures(1, &m->old_texture_id);
     m->old_texture_id = 0;
   }
 
   if (m->new_texture_id != 0) {
     m->old_texture_id = m->new_texture_id;
+    m->old_img_w = m->img_w; 
+    m->old_img_h = m->img_h; 
     m->transition_required = 1;
     m->in_transition = 1;
     m->progress = 0.0f;
   }
   else {
-    m->old_texture_id  = nextTex;
+    m->old_img_h = new_h;
+    m->old_img_w = new_w;
     m->transition_required = 0;
     m->in_transition = 0;
     m->progress = 1;
   }
-
-  m->old_img_w = m->img_w; 
-  m->old_img_h = m->img_h; 
-
   m->new_texture_id = nextTex;
 
   m->img_w = new_w;
@@ -286,5 +285,6 @@ int main(void) {
 
   close(daemon_sock);
   unlink(SOCK_PATH);
+  free(app);
   return 0;
 }

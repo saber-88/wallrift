@@ -8,11 +8,7 @@
 #include <GL/glext.h>
 #include <GLES2/gl2.h>
 #include <stdio.h>
-#include <mimalloc.h>
 
-#define STBI_MALLOC(sz)           mi_malloc(sz)
-#define STBI_REALLOC(p, newsz)    mi_realloc(p, newsz)
-#define STBI_FREE(p)              mi_free(p)
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/stb_image.h"
 
@@ -165,6 +161,8 @@ void gl_draw(APP *app, Monitor *m){
       if (m->progress >= 1.0f) {
         m->progress = 1.0f;
         m->in_transition = 0;
+        glDeleteTextures(1, &m->old_texture_id);
+        m->old_texture_id = 0;
       }
     }
     glUniform1f(app->gl.progress_loc, m->progress);
