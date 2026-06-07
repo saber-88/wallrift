@@ -38,11 +38,11 @@ typedef struct WLGlobal{
 
 Monitor * find_monitor_by_surface(APP* app, struct wl_surface *wl_surface);
 Monitor * find_monitor_by_layer_surface(APP* app, struct zwlr_layer_surface_v1 *ls);
-void setupWayland(APP *app);
-void setupCursor(APP *app);
-void setupEGLGlobal(APP *app);
-void setupSurface(APP *app, Monitor* m);
-void setupEGL(APP *app, Monitor* m);
+void setup_wayland(APP *app);
+void setup_cursor(APP *app);
+void setup_egl_global(APP *app);
+void setup_surface(APP *app, Monitor* m);
+void setup_egl(APP *app, Monitor* m);
 void request_frame(Monitor *m);
 
 

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-char *readFile(const char *path) {
+char *read_file(const char *path) {
   FILE *f = fopen(path, "rb");
   if (!f) {
     LOG_ERR ("FILE",  "Failed to open shader file: %s", path);
