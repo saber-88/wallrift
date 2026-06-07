@@ -174,8 +174,8 @@ void gl_draw(APP *app, Monitor *m){
 int setupOpenGL(APP *app){
 
   if ((app->gl.prog =
-      createProgram("/usr/share/wallrift/shaders/wallpaper.vert",
-                    "/usr/share/wallrift/shaders/wallpaper.frag")) == 0) {
+      createProgram("/home/karmveer/.coding/wallrift/shaders/wallpaper.vert",
+                    "/home/karmveer/.coding//wallrift/shaders/wallpaper.frag")) == 0) {
 
     LOG_ERR("GL", "Failed to create program");
     return 1;
