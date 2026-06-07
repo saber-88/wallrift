@@ -32,13 +32,13 @@ struct Command{
   float speed;
 };
 
-void printAvailableTransition(){
+void print_available_transitions(){
   printf("\033[1mAvailable transitons:\033[0m\n");
   printf("  \033[1mwipe\033[0m\n");
   printf("  \033[1mfade\033[0m\n");
   printf("  \033[1mnone\033[0m\n\n");
 }
-void printHelp(){
+void print_help(){
   printf("\033[1mwallrift - A smooth parallax supported wallpaper engine\033[0m.\n\n");
   printf("\033[1m\033[4mUsage\033[0m: \033[1mwallrift <COMMAND>\033[0m\n\n");
   printf("\033[1m\033[04mCommands:\033[0m \n\n");
@@ -51,7 +51,7 @@ void printHelp(){
   printf("  \033[1m-h,--help\033[0m     prints this help message.\n");
 }
 
-int handleSocket(struct Command command) {
+int handle_socket(struct Command command) {
     int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
     if (sock_fd == -1) {
@@ -151,7 +151,7 @@ int handleSocket(struct Command command) {
     
 }
 
-int validateTransition(char const* restrict string){
+int validate_transition(char const* restrict string){
   if
       (
         strcmp(string, "fade") == 0 || 
@@ -165,7 +165,7 @@ int validateTransition(char const* restrict string){
   return EXIT_FAILURE;
 };
 
-int validateFloat(char const* restrict string, float* outValue) {
+int validate_float(char const* restrict string, float* outValue) {
     if (string == NULL || *string == '\0') {
         return EXIT_FAILURE;
     }
@@ -188,7 +188,7 @@ int validateFloat(char const* restrict string, float* outValue) {
     return EXIT_FAILURE;
 }
 
-int validateImgPath(char const* restrict imgPath) {
+int validate_img_path(char const* restrict imgPath) {
     struct stat fileStatus;
     
     if (stat(imgPath, &fileStatus) != 0) {
@@ -205,7 +205,7 @@ int validateImgPath(char const* restrict imgPath) {
 int main(int argc, char *argv[]) {
     
     if (argc < 2) {
-        printHelp();
+        print_help();
         return EXIT_FAILURE;
     }
     
@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
         char* argument = argv[argsItr];
         
         if (strcmp(argument, "-h") == 0 || strcmp(argument, "--help") == 0) {
-            printHelp();
+            print_help();
             return EXIT_SUCCESS;
         }
         
@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
             if (command.img_s == eTrue) {
                 fprintf(stderr,"ignoring duplicate request: 'img'\n");
             }
-            else if ((argsItr + 1 < argc) && validateImgPath(argv[argsItr + 1]) == EXIT_SUCCESS) {
+            else if ((argsItr + 1 < argc) && validate_img_path(argv[argsItr + 1]) == EXIT_SUCCESS) {
                 command.img_s = eTrue;
                 command.path = argv[++argsItr];
             }
@@ -247,7 +247,7 @@ int main(int argc, char *argv[]) {
             if (command.speed_s == eTrue) {
                 fprintf(stderr,"ignoring duplicate request: 'speed'\n");
             }
-            else if ((argsItr + 1 < argc) && validateFloat(argv[argsItr + 1], &command.speed) == EXIT_SUCCESS) {
+            else if ((argsItr + 1 < argc) && validate_float(argv[argsItr + 1], &command.speed) == EXIT_SUCCESS) {
                 command.speed_s = eTrue;
                 argsItr++;
             }
@@ -261,14 +261,14 @@ int main(int argc, char *argv[]) {
             if (command.transition_s == eTrue) {
                 fprintf(stderr,"ignoring duplicate request: 'transition'\n");
             }
-            else if ((argsItr + 1 < argc) && validateTransition(argv[argsItr + 1]) == EXIT_SUCCESS) {
+            else if ((argsItr + 1 < argc) && validate_transition(argv[argsItr + 1]) == EXIT_SUCCESS) {
                 command.transition_s = eTrue;
                 command.transition = argv[++argsItr];
             }
             else {
                 command.transition_s = eError;
                 fprintf(stderr,"invalid argument for 'transition'. expected a valid transition!\n");
-                printAvailableTransition();
+                print_available_transitions();
             }
         }
 
@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
       return EXIT_FAILURE;
     }
 
-    if (handleSocket(command) == EXIT_FAILURE) {
+    if (handle_socket(command) == EXIT_FAILURE) {
       fprintf(stderr, "command failed\n");
       return EXIT_FAILURE;
     }
