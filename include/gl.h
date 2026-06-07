@@ -26,10 +26,10 @@ typedef struct GL{
   float speed;
 } GL;
 
-GLuint createShader(GLenum type, const char *shaderSrc); 
+GLuint create_shader(GLenum type, const char *shaderSrc); 
 
-GLuint createProgram(const char *vFilePath, const char *fFilePath); 
-GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int* imageHeight); 
+GLuint create_program(const char *vFilePath, const char *fFilePath); 
+GLuint load_img_into_gpu(char *imgPath, int *imageWidth, int* imageHeight); 
 
 void gl_draw(APP *app , Monitor *m);
-int setupOpenGL(APP *app);
+int setup_openGL(APP *app);

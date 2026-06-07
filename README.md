@@ -79,6 +79,13 @@ wallrift img /path/to/image.jpg
 wallrift img ~/wallpapers/bg.jpg speed 0.03
 ```
 
+### Set transition
+
+```bash
+wallrift transition fade
+```
+
+
 ---
 
 ## ⚙️ Commands
@@ -87,6 +94,7 @@ wallrift img ~/wallpapers/bg.jpg speed 0.03
 |--------|------------|
 | `img <path>` | Set wallpaper image |
 | `speed <value>` | Set parallax speed (0.0 – 1.0) |
+| `transition <value>` | Set transition effect |
 
 ---
 
@@ -136,8 +144,8 @@ Wallrift uses a Unix domain socket for IPC:
 
 ## 📌 Roadmap
 
-- [ ] Memory optimization  
-- [ ] Smooth transitions  
+- [x] Memory optimization  
+- [x] Smooth transitions  
 - [x] Multi-monitor support  
 - [ ] Animated wallpapers  
 - [ ] Config file support  

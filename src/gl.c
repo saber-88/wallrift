@@ -8,6 +8,7 @@
 #include <GL/glext.h>
 #include <GLES2/gl2.h>
 #include <stdio.h>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "../include/stb_image.h"
 
@@ -27,7 +28,7 @@ float vertices[] = {
 
 unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
 
-GLuint createShader(GLenum type, const char *shaderSrc) {
+GLuint create_shader(GLenum type, const char *shaderSrc) {
   GLuint shader = glCreateShader(type);
   glShaderSource(shader, 1, &shaderSrc, NULL);
   glCompileShader(shader);
@@ -42,9 +43,9 @@ GLuint createShader(GLenum type, const char *shaderSrc) {
   return shader;
 }
 
-GLuint createProgram(const char *vFilePath, const char *fFilePath) {
-  const char *vsrc = readFile(vFilePath);
-  const char *fsrc = readFile(fFilePath);
+GLuint create_program(const char *vFilePath, const char *fFilePath) {
+  const char *vsrc = read_file(vFilePath);
+  const char *fsrc = read_file(fFilePath);
   if (!vsrc || !fsrc) {
     LOG_ERR("GL", "Failed to open shader file");
     free((void*)vsrc);
@@ -52,8 +53,8 @@ GLuint createProgram(const char *vFilePath, const char *fFilePath) {
     return 0;
   }
 
-  GLuint vs = createShader(GL_VERTEX_SHADER, vsrc);
-  GLuint fs = createShader(GL_FRAGMENT_SHADER, fsrc);
+  GLuint vs = create_shader(GL_VERTEX_SHADER, vsrc);
+  GLuint fs = create_shader(GL_FRAGMENT_SHADER, fsrc);
   GLint success;
   char infoLog[512];
 
@@ -83,7 +84,7 @@ GLuint createProgram(const char *vFilePath, const char *fFilePath) {
   glDeleteShader(fs);
   return prog;
 }
-GLuint loadImageIntoGPU(char *imgPath, int *imageWidth, int *imageHeight) {
+GLuint load_img_into_gpu(char *imgPath, int *imageWidth, int *imageHeight) {
 
   char expanded[1024];
   if (imgPath[0] == '~') {
@@ -160,6 +161,8 @@ void gl_draw(APP *app, Monitor *m){
       if (m->progress >= 1.0f) {
         m->progress = 1.0f;
         m->in_transition = 0;
+        glDeleteTextures(1, &m->old_texture_id);
+        m->old_texture_id = 0;
       }
     }
     glUniform1f(app->gl.progress_loc, m->progress);
@@ -168,10 +171,10 @@ void gl_draw(APP *app, Monitor *m){
     eglSwapBuffers(app->egl.egl_display, m->egl_surface);
 }
 
-int setupOpenGL(APP *app){
+int setup_openGL(APP *app){
 
   if ((app->gl.prog =
-      createProgram("/usr/share/wallrift/shaders/wallpaper.vert",
+      create_program("/usr/share/wallrift/shaders/wallpaper.vert",
                     "/usr/share/wallrift/shaders/wallpaper.frag")) == 0) {
 
     LOG_ERR("GL", "Failed to create program");

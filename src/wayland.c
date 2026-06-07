@@ -85,13 +85,13 @@ static void registry_handler(void *data, struct wl_registry *registry,
     }
 
     if (app->egl.egl_display != EGL_NO_DISPLAY && app->egl.egl_context != EGL_NO_CONTEXT) {
-      setupSurface(app, m);
-      setupEGL(app, m);
+      setup_surface(app, m);
+      setup_egl(app, m);
       if (app->monitors[0].new_texture_id != 0) {
         char* wall = (char *)get_cached_wallpaper();
         if (wall) {
           eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context);
-          m->new_texture_id = loadImageIntoGPU(wall, &m->img_w, &m->img_h);
+          m->new_texture_id = load_img_into_gpu(wall, &m->img_w, &m->img_h);
         }
         gl_draw(app, m);
         LOG_INFO("WL", "Hotplugged monitor id: %d set up done",m->global_name);
@@ -333,7 +333,7 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time){
   }
 }
 
-void setupWayland(APP *app){
+void setup_wayland(APP *app){
   app->wl.display = wl_display_connect(NULL);
 
   if (!app->wl.display) {
@@ -353,13 +353,10 @@ void setupWayland(APP *app){
   ext_idle_notification_v1_add_listener(app->wl.notification, &idle_notif_listener, app);
 }
 
-void setupCursor(APP *app){
+void setup_cursor(APP *app){
 
   if (app->wl.shm) {
-    /* supports X_CURSOR only cause hyprcursor uses
-     * different format for cursor and does not have API
-     * to work with.
-     */
+
     char* theme = getenv("XCURSOR_THEME");
     char* cursor_size = getenv("XCURSOR_SIZE");
     
@@ -378,7 +375,7 @@ void setupCursor(APP *app){
   }
 }
 
-void setupSurface(APP *app, Monitor *m){
+void setup_surface(APP *app, Monitor *m){
 
   // getting surfaces and mouse pointer
   m->surface = wl_compositor_create_surface(app->wl.compositor);
@@ -416,7 +413,7 @@ void setupSurface(APP *app, Monitor *m){
   LOG_INFO("WL", "Monitor id: %d, width: %d, height: %d", m->global_name, m->width, m->height);
 }
 
-void setupEGLGlobal(APP *app){
+void setup_egl_global(APP *app){
 app->egl.egl_display = eglGetDisplay((EGLNativeDisplayType)app->wl.display);
   if (!eglInitialize(app->egl.egl_display, NULL, NULL)) {
       LOG_ERR("EGL", "Init failed");
@@ -450,7 +447,7 @@ app->egl.egl_display = eglGetDisplay((EGLNativeDisplayType)app->wl.display);
   }
 }
 
-void setupEGL(APP *app, Monitor *m){
+void setup_egl(APP *app, Monitor *m){
   m->egl_window = wl_egl_window_create(m->surface, m->width, m->height);
 
   if (!m->egl_window) {

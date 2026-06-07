@@ -85,34 +85,33 @@ void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path) {
   eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context);
 
   int new_w = 0, new_h = 0;
-  GLuint nextTex = loadImageIntoGPU((char*)path, &new_w, &new_h);
+  GLuint nextTex = load_img_into_gpu((char*)path, &new_w, &new_h);
 
   if (nextTex == 0 || new_w == 0 || new_h == 0) {
     LOG_ERR("GL", "Failed to load image: %s", path);
     return;
   }
 
-  if (m->in_transition && m->old_texture_id != 0) {
+  if (m->old_texture_id != 0) {
     glDeleteTextures(1, &m->old_texture_id);
     m->old_texture_id = 0;
   }
 
   if (m->new_texture_id != 0) {
     m->old_texture_id = m->new_texture_id;
+    m->old_img_w = m->img_w; 
+    m->old_img_h = m->img_h; 
     m->transition_required = 1;
     m->in_transition = 1;
     m->progress = 0.0f;
   }
   else {
-    m->old_texture_id  = nextTex;
+    m->old_img_h = new_h;
+    m->old_img_w = new_w;
     m->transition_required = 0;
     m->in_transition = 0;
     m->progress = 1;
   }
-
-  m->old_img_w = m->img_w; 
-  m->old_img_h = m->img_h; 
-
   m->new_texture_id = nextTex;
 
   m->img_w = new_w;
@@ -185,14 +184,14 @@ int main(void) {
    */
   app->gl.speed = 0.05f;
 
-  setupWayland(app);
-  setupCursor(app);
-  setupEGLGlobal(app);
+  setup_wayland(app);
+  setup_cursor(app);
+  setup_egl_global(app);
   
   // setting up surface and egl for each monitor
   for (int i = 0; i < app->monitor_count; i++) {
-    setupSurface(app, &app->monitors[i]);
-    setupEGL(app, &app->monitors[i]);
+    setup_surface(app, &app->monitors[i]);
+    setup_egl(app, &app->monitors[i]);
     LOG_INFO("EGL", "Setup done for monitor %d with id: %d",i,app->monitors[i].global_name);
   }
 
@@ -207,7 +206,7 @@ int main(void) {
                 );
   
   // setting up OpenGL
-  if (setupOpenGL(app)) {
+  if (setup_openGL(app)) {
     LOG_ERR("GL","Failed to setup opengGL");
     return 1;
   }
@@ -286,5 +285,6 @@ int main(void) {
 
   close(daemon_sock);
   unlink(SOCK_PATH);
+  free(app);
   return 0;
 }
