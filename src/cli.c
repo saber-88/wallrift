@@ -59,8 +59,6 @@ int handle_socket(struct Command command) {
     return EXIT_FAILURE;
   }
   ssize_t sent = send_all(sock_fd, &command, sizeof(struct Command));
-  LOG_INFO("SOCK", "send_all returned %zd (expected %zu)", sent,
-           sizeof(struct Command));
 
   if (sent < 0) {
     LOG_ERR("SOCK", "Failed to send command.");
