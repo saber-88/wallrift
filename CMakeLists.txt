@@ -17,6 +17,7 @@ add_executable(wallrift-daemon
     src/file.c
     src/wayland.c
     src/gl.c
+    src/command.c
     src/zwlr-layer-shell-protocol.c
     src/xdg-shell-protocol.c
     src/ext-idle-notify-v1-protocol.c
@@ -78,5 +79,6 @@ endif()
 add_executable(wallrift
     src/cli.c
     src/file.c
+    src/command.c
 )
 target_include_directories(wallrift PRIVATE include)

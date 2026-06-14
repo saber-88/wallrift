@@ -97,7 +97,8 @@ GLuint load_img_into_gpu(char *imgPath, int *imageWidth, int *imageHeight) {
 
   unsigned char *pixels = stbi_load(expanded, imageWidth, imageHeight, &channels, 4);
   if (!pixels) {
-    LOG_ERR("GL", "Failed to load image");
+    LOG_ERR("GL", "Failed to load image from path: %s", expanded);
+    LOG_ERR("GL", "STBI Reason: %s", stbi_failure_reason());
     return 0;
   }
 
