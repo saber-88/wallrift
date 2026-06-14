@@ -5,7 +5,7 @@ A lightweight Wayland wallpaper engine featuring smooth, GPU-accelerated **paral
 ---
 
 ## 🧭 Preview
-https://github.com/user-attachments/assets/0987d409-daf4-4777-9a38-25e060707f63
+https://github.com/user-attachments/assets/9a18ecbf-7bb7-48cd-a566-08bc9b3c75bb
 
 ---
 

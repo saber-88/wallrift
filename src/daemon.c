@@ -2,11 +2,11 @@
 
 /// @author : github.com/saber-88
 
-
-#include <fcntl.h>
 #include <EGL/egl.h>
 #include <EGL/eglplatform.h>
 #include <GLES2/gl2.h>
+#include <fcntl.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,27 +18,29 @@
 #include <wayland-client-protocol.h>
 #include <wayland-cursor.h>
 #include <wayland-egl.h>
+#include <signal.h>
 
-#include "../include/wayland.h"
-#include "../include/gl.h"
-#include "../include/file.h"
-#include "log.h"
 #include "../include/app.h"
+#include "../include/file.h"
+#include "../include/gl.h"
+#include "../include/wayland.h"
+#include "command.h"
+#include "log.h"
 #include "monitor.h"
 
 #define SOCK_PATH "/tmp/wallrift.sock"
 
-//forward declarations
+// forward declarations
+
+volatile sig_atomic_t running = 1;
+
+void handle_signal(int sig);
 int setup_daemon_socket(void);
 void handle_client(int daemon_sock, APP *app);
-void load_wallpaper_for_monitor(APP *app, Monitor* m, const char *path);
+void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path);
 void gl_set_transition(const char *name);
 
-typedef enum {
-  FADE = 0,
-  WIPE,
-  NONE
-} TTYPE;
+typedef enum { FADE = 0, WIPE, NONE } TTYPE;
 TTYPE transition_t = FADE;
 
 void gl_set_transition(const char *name) {
@@ -46,46 +48,51 @@ void gl_set_transition(const char *name) {
     transition_t = FADE;
   } else if (strcmp(name, "wipe") == 0) {
     transition_t = WIPE;
-  } 
-  else if (strcmp(name, "none") == 0) {
+  } else if (strcmp(name, "none") == 0) {
     transition_t = NONE;
-  } 
+  }
 }
 
-int setup_daemon_socket(void){
+void handle_signal(int sig){
+  (void)sig;
+  running = 0;
+}
+int setup_daemon_socket(void) {
   int daemon_sock = socket(AF_UNIX, SOCK_STREAM, 0);
   if (daemon_sock == -1) {
     perror("Socket\n");
     return -1;
   }
-  
+
   struct sockaddr_un d_addr = {0};
   d_addr.sun_family = AF_UNIX;
   strncpy(d_addr.sun_path, SOCK_PATH, sizeof(d_addr.sun_path) - 1);
   d_addr.sun_path[sizeof(d_addr.sun_path) - 1] = '\0';
   unlink(SOCK_PATH);
 
-  if (bind(daemon_sock, (struct sockaddr*)&d_addr, sizeof(d_addr)) == -1) {
-    LOG_ERR ("SOCK",  "Failed to bind socket");
+  if (bind(daemon_sock, (struct sockaddr *)&d_addr, sizeof(d_addr)) == -1) {
+    LOG_ERR("SOCK", "Failed to bind socket");
     close(daemon_sock);
     return -1;
   }
 
-  LOG_INFO("SOCK",  "Socket created at %s", SOCK_PATH);
+  LOG_INFO("SOCK", "Socket created at %s", SOCK_PATH);
   listen(daemon_sock, 5);
 
-  LOG_INFO("SOCK",  "Listening...");
+  LOG_INFO("SOCK", "Listening...");
   int flags = fcntl(daemon_sock, F_GETFL, 0);
   fcntl(daemon_sock, F_SETFL, flags | O_NONBLOCK);
   return daemon_sock;
 }
 void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path) {
-  if (!path || path[0] == '\0') return;
+  if (!path || path[0] == '\0')
+    return;
 
-  eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface, app->egl.egl_context);
+  eglMakeCurrent(app->egl.egl_display, m->egl_surface, m->egl_surface,
+                 app->egl.egl_context);
 
   int new_w = 0, new_h = 0;
-  GLuint nextTex = load_img_into_gpu((char*)path, &new_w, &new_h);
+  GLuint nextTex = load_img_into_gpu((char *)path, &new_w, &new_h);
 
   if (nextTex == 0 || new_w == 0 || new_h == 0) {
     LOG_ERR("GL", "Failed to load image: %s", path);
@@ -99,13 +106,12 @@ void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path) {
 
   if (m->new_texture_id != 0) {
     m->old_texture_id = m->new_texture_id;
-    m->old_img_w = m->img_w; 
-    m->old_img_h = m->img_h; 
+    m->old_img_w = m->img_w;
+    m->old_img_h = m->img_h;
     m->transition_required = 1;
     m->in_transition = 1;
     m->progress = 0.0f;
-  }
-  else {
+  } else {
     m->old_img_h = new_h;
     m->old_img_w = new_w;
     m->transition_required = 0;
@@ -117,69 +123,69 @@ void load_wallpaper_for_monitor(APP *app, Monitor *m, const char *path) {
   m->img_w = new_w;
   m->img_h = new_h;
 
-  snprintf(m->wallpath, sizeof(m->wallpath), "%s", path); 
+  snprintf(m->wallpath, sizeof(m->wallpath), "%s", path);
 }
 
-void handle_client(int daemon_sock, APP *app){
+void handle_client(int daemon_sock, APP *app) {
   int client = accept(daemon_sock, NULL, NULL);
   if (client != -1) {
-    char buff[1024];
-    int n = read(client, buff, sizeof(buff)-1);
+    LOG_INFO("SOCK", "Accepted client fd=%d", client);
+    struct Command cmd;
+    memset(&cmd, 0,sizeof(cmd)); 
+
+    ssize_t n = recv_all(client, &cmd, sizeof(struct Command));
     close(client);
-    if (n > 0) {
-      buff[n] = '\0';
-      char *path = NULL;
-      char *tok = strtok(buff, " ");
 
-      while (tok) {
-        if (strcmp(tok, "img") == 0 || strcmp(tok, "-i") == 0) {
-          tok = strtok(NULL, " ");
-          if (tok) {
-            path = tok;
-          }
-        }
-        else if (strcmp(tok, "speed") == 0 || strcmp(tok, "-s") == 0) {
-           tok = strtok(NULL, " ");
-           if (tok) {
-             app->gl.speed = strtof(tok, NULL);
-             if (app->gl.speed <= 0.00) app->gl.speed = 0.00f;
-             if (app->gl.speed >= 1.00) app->gl.speed = 1.00f;
-           }
-        }
-        else if (strcmp(tok, "transition") == 0 || strcmp(tok, "-t") == 0) {
-           tok = strtok(NULL, " ");
-           if (tok) {
-              gl_set_transition(tok);
-              app->gl.transition_type = transition_t;
-              LOG_INFO("SOCK", "Got the transition : %s",tok);         
-           }
-        } 
-        tok = strtok(NULL, " ");
-      }
+    if (n != (ssize_t)sizeof(struct Command)) {
+      LOG_ERR("SOCK", "Failed to receive full command (%zd/%zu bytes)", n,
+              sizeof(struct Command));
+      return;
+    }
 
-      if (path) {
-        Monitor *m = app->active_monitor;
-        if (!m){
-          LOG_WARN("WL", "No active monitor");
-          return;
-        } 
-        if (strcmp(path, m->wallpath) == 0) return; 
-        load_wallpaper_for_monitor(app, m, path);
-        request_frame(m);
-        wl_display_flush(app->wl.display);
-        cache_wallpaper(path);
+    close(client);
+    const char *path = cmd.path;
+    const char *transition_recieved = cmd.transition;
+    float speed = cmd.speed;
+    if (cmd.transition_s == eTrue) {
+
+      gl_set_transition(transition_recieved);
+      app->gl.transition_type = transition_t;
+      LOG_INFO("SOCK", "Got the transition : %s", transition_recieved);
+    }
+    if (cmd.speed_s == eTrue) {
+
+      app->gl.speed = speed;
+      if (app->gl.speed <= 0.00)
+        app->gl.speed = 0.00f;
+      if (app->gl.speed >= 1.00)
+        app->gl.speed = 1.00f;
+    }
+    if (cmd.img_s == eTrue) {
+      Monitor *m = app->active_monitor;
+      if (!m) {
+        LOG_WARN("WL", "No active monitor");
+        return;
       }
+      if (strcmp(path, m->wallpath) == 0)
+        return;
+      load_wallpaper_for_monitor(app, m, path);
+      request_frame(m);
+      wl_display_flush(app->wl.display);
+      cache_wallpaper(path);
     }
   }
 }
 
 int main(void) {
   
+  signal(SIGINT, handle_signal);
+  signal(SIGTERM, handle_signal);
+
   APP *app = calloc(1, sizeof(APP));
 
   /* setting initial speed to 0.05 for smooth parallax
-   * i need to implement config file support soon so 
-   * that i can read from config file instead of 
+   * i need to implement config file support soon so
+   * that i can read from config file instead of
    * hardcoding values.
    */
   app->gl.speed = 0.05f;
@@ -187,42 +193,38 @@ int main(void) {
   setup_wayland(app);
   setup_cursor(app);
   setup_egl_global(app);
-  
+
   // setting up surface and egl for each monitor
   for (int i = 0; i < app->monitor_count; i++) {
     setup_surface(app, &app->monitors[i]);
     setup_egl(app, &app->monitors[i]);
-    LOG_INFO("EGL", "Setup done for monitor %d with id: %d",i,app->monitors[i].global_name);
+    LOG_INFO("EGL", "Setup done for monitor %d with id: %d", i,
+             app->monitors[i].global_name);
   }
 
   /* making context current before opengGL setup
    * because nvidia likes it this way
    */
 
-  eglMakeCurrent(app->egl.egl_display,
-                 app->monitors[0].egl_surface,
-                 app->monitors[0].egl_surface,
-                 app->egl.egl_context
-                );
-  
+  eglMakeCurrent(app->egl.egl_display, app->monitors[0].egl_surface,
+                 app->monitors[0].egl_surface, app->egl.egl_context);
+
   // setting up OpenGL
   if (setup_openGL(app)) {
-    LOG_ERR("GL","Failed to setup opengGL");
+    LOG_ERR("GL", "Failed to setup opengGL");
     return 1;
   }
-  
+
   // app->gl.texLoc = glGetUniformLocation(app->gl.prog, "u_old_tex");
 
-  
   // initially loading cached wallpaper for every monitor
-  const char* cached = get_cached_wallpaper();
+  const char *cached = get_cached_wallpaper();
   if (cached) {
-     for (int i = 0; i < app->monitor_count; i++) {
-       load_wallpaper_for_monitor(app, &app->monitors[i], cached);
-    }   
+    for (int i = 0; i < app->monitor_count; i++) {
+      load_wallpaper_for_monitor(app, &app->monitors[i], cached);
+    }
   }
 
-  
   // initially drawing cached wallpaper for every monitor
   for (int i = 0; i < app->monitor_count; i++) {
     gl_draw(app, &app->monitors[i]);
@@ -231,7 +233,7 @@ int main(void) {
 
   int daemon_sock = setup_daemon_socket();
   if (daemon_sock == -1) {
-    LOG_ERR("SOCK","Failed to setup daemon socket");
+    LOG_ERR("SOCK", "Failed to setup daemon socket");
     return 1;
   }
 
@@ -244,10 +246,10 @@ int main(void) {
   fds[1].fd = daemon_sock;
   fds[1].events = POLLIN;
   int did_read = 0;
-  
+
   app->wl.cursor_moved = 1;
   // render loop
-  while (1) {
+  while (running) {
     did_read = 0;
     wl_display_dispatch_pending(app->wl.display);
 
@@ -263,7 +265,7 @@ int main(void) {
       }
     }
     if (app->active_monitor->in_transition) {
-        timeout = 0;
+      timeout = 0;
     }
     int ret = poll(fds, 2, timeout);
 
