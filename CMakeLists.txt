@@ -31,7 +31,6 @@ target_link_libraries(wallrift-daemon
     EGL
     GLESv2
     m
-    mimalloc
 )
 
 # warnings — always on
