@@ -10,7 +10,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-find_package(mimalloc REQUIRED)
 # daemon
 add_executable(wallrift-daemon
     src/daemon.c
