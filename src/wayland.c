@@ -28,7 +28,14 @@ Monitor* find_monitor_by_surface(APP *app, struct wl_surface* surface){
   }
   return NULL;
 }
-
+Monitor* find_monitor_by_name(APP *app, const char* name){
+  for (int i = 0 ; i < app->monitor_count; i++) {
+    if (strcmp(app->monitors[i].technical_name, name) == 0) {
+      return &app->monitors[i];
+    }
+  }
+  return NULL;
+}
 Monitor * find_monitor_by_layer_surface(APP* app, struct zwlr_layer_surface_v1 *ls){
   for (int i = 0 ; i < app->monitor_count; i++) {
     if (app->monitors[i].layer_surface == ls) {
@@ -38,8 +45,48 @@ Monitor * find_monitor_by_layer_surface(APP* app, struct zwlr_layer_surface_v1 *
   return NULL;
 }
 
+static void output_geometry(void *data, struct wl_output *wl_output, int x, int y,
+                            int physical_width, int physical_height, int subpixel,
+                            const char *make, const char *model, int transform) {
+    (void)data; (void)wl_output; (void)x; (void)y; (void)physical_width;
+    (void)physical_height; (void)subpixel; (void)make; (void)model; (void)transform;
+}
+
+static void output_mode(void *data, struct wl_output *wl_output, uint32_t flags,
+                        int width, int height, int refresh) {
+    (void)data; (void)wl_output; (void)flags; (void)width; (void)height; (void)refresh;
+}
+
+static void output_done(void *data, struct wl_output *wl_output) {
+    (void)data; (void)wl_output;
+}
+
+static void output_scale(void *data, struct wl_output *wl_output, int factor) {
+    (void)data; (void)wl_output; (void)factor;
+}
+
+static void output_description(void *data, struct wl_output *wl_output, const char *description) {
+    (void)data; (void)wl_output; (void)description;
+}
+
+static void output_name(void* data, struct wl_output *wl_output, const char* name){
+  Monitor* m = (Monitor *)data;
+  snprintf(m->technical_name, sizeof(m->technical_name),"%s",name);
+  LOG_INFO("WL", "Monitor global %u assigned output name: %s", m->global_name, name);
+  (void)wl_output;
+
+}
 static const struct wl_callback_listener frame_listener = {
   .done = frame_done 
+};
+
+static const struct wl_output_listener output_listener = {
+  .geometry = output_geometry,
+  .mode = output_mode,
+  .done = output_done,
+  .scale = output_scale,
+  .name = output_name,
+  .description = output_description
 };
 
 void request_frame(Monitor *m) {
@@ -76,8 +123,9 @@ static void registry_handler(void *data, struct wl_registry *registry,
   else if (!strcmp(interface, "wl_output")) {
     Monitor *m = &app->monitors[app->monitor_count++];
     memset(m, 0, sizeof(Monitor));
-    m->output = wl_registry_bind(registry, id, &wl_output_interface, 1);
+    m->output = wl_registry_bind(registry, id, &wl_output_interface, 4);
     m->global_name = id;
+    wl_output_add_listener(m->output, &output_listener, m);
     m->app = app;
     m->cursor_x = 0.05f;
     if (app->monitor_count == 1) {
@@ -94,7 +142,7 @@ static void registry_handler(void *data, struct wl_registry *registry,
           m->new_texture_id = load_img_into_gpu(wall, &m->img_w, &m->img_h);
         }
         gl_draw(app, m);
-        LOG_INFO("WL", "Hotplugged monitor id: %d set up done",m->global_name);
+        LOG_INFO("WL", "Hotplugged monitor id: %d, name : %s set up done",m->global_name,m->technical_name);
       }
     }
   }

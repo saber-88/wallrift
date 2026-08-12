@@ -36,6 +36,7 @@ typedef struct WLGlobal{
 
 } WLGlobal;
 
+Monitor* find_monitor_by_name(APP *app, const char* name);
 Monitor * find_monitor_by_surface(APP* app, struct wl_surface *wl_surface);
 Monitor * find_monitor_by_layer_surface(APP* app, struct zwlr_layer_surface_v1 *ls);
 void setup_wayland(APP *app);

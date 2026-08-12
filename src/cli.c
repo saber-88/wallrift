@@ -1,7 +1,10 @@
 /// @author : github.com/saber-88 @contributes: wallrift-daemon
 /// @author : github.com/its-19818942118 @contributes: wallrift-cli
 
+#define WALLRIFT_VERSION "1.5.0"
+
 #include "command.h"
+#include "file.h"
 #include "log.h"
 #include <errno.h>
 #include <math.h>
@@ -32,14 +35,20 @@ void print_help() {
   printf("  \033[1mspeed, -s\033[0m         sets the speed( 0.00 - 1.00 ) for "
          "parallax.\n");
   printf("  \033[1mtransition, -t\033[0m    sets the transition type\n");
-  printf("  \033[1mquery, -q\033[0m         prints the current applied "
-         "wallpaper.\n");
+  printf("  \033[1mquery, -q\033[0m         prints the current applied wallpaper.\n");
+  printf("  \033[1moutput, -o\033[0m        targets a specific Wayland monitor output name.\n"); 
 
   printf("\033[1m\033[04m\nOptions:\033[0m \n\n");
-  printf("  \033[1m-h,--help\033[0m     prints this help message.\n");
+  printf("  \033[1m-h,--help\033[0m         prints this help message.\n");
+  printf("  \033[1m-v,--version\033[0m      prints the current version of wallrift.\n");
+
 }
 
 int handle_socket(struct Command command) {
+  if (command.query_s == eTrue) {
+    printf("%s\n", get_cached_wallpaper());
+    return EXIT_SUCCESS;
+  }
   int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
   if (sock_fd == -1) {
@@ -68,6 +77,13 @@ int handle_socket(struct Command command) {
   return EXIT_SUCCESS;
 }
 
+int validate_output(char const *restrict name){
+  if (!name || strlen(name) < 3 || strlen(name) > MAX_OUTPUT_LEN) {
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
+}
 int validate_transition(char const *restrict string) {
   if (strcmp(string, "fade") == 0 || strcmp(string, "wipe") == 0 ||
       strcmp(string, "none") == 0) {
@@ -114,6 +130,9 @@ int validate_img_path(char const *restrict imgPath) {
   return EXIT_SUCCESS;
 }
 
+void print_version(){
+  printf("%s\n",WALLRIFT_VERSION);
+}
 int main(int argc, char *argv[]) {
 
   if (argc < 2) {
@@ -128,6 +147,7 @@ int main(int argc, char *argv[]) {
   command.speed_s = eFalse;
   command.query_s = eFalse;
   command.transition_s = eFalse;
+  command.ouput_s = eFalse;
   command.speed = 0.05f;
 
   for (size_t argsItr = 1; argsItr < argc; ++argsItr) {
@@ -136,6 +156,11 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(argument, "-h") == 0 || strcmp(argument, "--help") == 0) {
       print_help();
+      return EXIT_SUCCESS;
+    }
+
+    else if (strcmp(argument, "-v") == 0 || strcmp(argument, "--version") == 0) {
+      print_version();
       return EXIT_SUCCESS;
     }
 
@@ -187,6 +212,20 @@ int main(int argc, char *argv[]) {
       }
     }
 
+    else if (strcmp(argument, "output") == 0 || strcmp(argument, "-o") == 0) {
+      if (command.ouput_s == eTrue) {
+        fprintf(stderr, "ignoring duplicate request: 'output'\n");
+      } else if ((argsItr + 1 < argc) && validate_output(argv[argsItr + 1]) == EXIT_SUCCESS) {
+        command.ouput_s = eTrue;
+        strncpy(command.output, argv[++argsItr], MAX_OUTPUT_LEN - 1);
+        command.output[MAX_OUTPUT_LEN - 1] = '\0';
+      } else {
+        command.ouput_s = eError;
+        fprintf(stderr, "invalid argument for 'output'. expected a valid "
+                        "output name!\n");
+      }
+    }
+
     else if (strcmp(argument, "query") == 0 || strcmp(argument, "-q") == 0) {
       if (command.query_s == eTrue) {
         printf("ignoring duplicate request: 'query'\n");
@@ -205,8 +244,12 @@ int main(int argc, char *argv[]) {
   }
 
   if (command.img_s == eError || command.speed_s == eError ||
-      command.transition_s == eError) {
-    fprintf(stderr, "Exiting due to errors!");
+      command.transition_s == eError || command.ouput_s == eError) {
+    fprintf(stderr, "Exiting due to errors!\n");
+    return EXIT_FAILURE;
+  }
+  if (command.ouput_s == eTrue && (command.img_s == eFalse)) {
+    fprintf(stderr, "output option needs img path\n");
     return EXIT_FAILURE;
   }
 

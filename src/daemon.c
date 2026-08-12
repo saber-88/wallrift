@@ -146,6 +146,15 @@ void handle_client(int daemon_sock, APP *app) {
     const char *path = cmd.path;
     const char *transition_recieved = cmd.transition;
     float speed = cmd.speed;
+    
+    if (cmd.ouput_s == eTrue) {
+      Monitor *m = find_monitor_by_name(app, cmd.output);
+      if (!m) {
+        LOG_WARN("WL", "No monitor with name %s",cmd.output);
+        return;
+      }
+      app->active_monitor = m;
+    }
     if (cmd.transition_s == eTrue) {
 
       gl_set_transition(transition_recieved);

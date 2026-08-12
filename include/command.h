@@ -10,6 +10,7 @@ enum State {
 };
 
 #define MAX_PATH_LEN 512
+#define MAX_OUTPUT_LEN 128
 #define MAX_TRANS_LEN 64
 
 struct __attribute__((packed)) Command {
@@ -17,8 +18,10 @@ struct __attribute__((packed)) Command {
     uint8_t speed_s;
     uint8_t query_s;
     uint8_t transition_s;
+    uint8_t ouput_s;
 
     char path[MAX_PATH_LEN];
+    char output[MAX_OUTPUT_LEN];
     char transition[MAX_TRANS_LEN];
     float speed;
 };

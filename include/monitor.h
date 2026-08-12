@@ -29,5 +29,6 @@ typedef struct Monitor {
     GLuint new_texture_id;
 
     char wallpath[5000];
+    char technical_name[128];
 
 } Monitor;
